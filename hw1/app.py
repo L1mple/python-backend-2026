@@ -113,7 +113,7 @@ async def application(
         await send({"type": "http.response.body","body": b""})
 
     #await send({"type": "http.response.start", "status": 200})
-    #await send({"type": "http.response.body", "body": b"Hello, world!"})
+    #await send({"type": "http.response.body", "body": b"Hello, world"})
 
 
 
