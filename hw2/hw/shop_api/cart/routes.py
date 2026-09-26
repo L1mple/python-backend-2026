@@ -6,8 +6,8 @@ from fastapi import APIRouter, Response, Query, HTTPException
 
 from shop_api.cart.contracts import CartResponse
 
-import hw2.hw.store.cart as cart_repo
-import hw2.hw.store.item as item_repo
+import store.cart as cart_repo
+import store.item as item_repo
 
 router = APIRouter()
 

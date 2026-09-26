@@ -10,7 +10,7 @@ from .contracts import (
     PatchItemRequest
 )
 
-from hw2.hw.store import item as item_repo
+import store.item as item_repo
 
 router = APIRouter()
 
