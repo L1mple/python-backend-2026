@@ -1,9 +1,4 @@
-import json
-import pathlib
-
 from shop_api.models import Item, Cart
-
-JSON_PATH = "./data.json"
 
 
 class BaseStore[T]:
@@ -53,6 +48,10 @@ class Store:
     _items: ItemStore
     _carts: CartStore
 
+    def __init__(self):
+        self._items = ItemStore({})
+        self._carts = CartStore({})
+
     @property
     def items(self) -> ItemStore:
         return self._items
@@ -60,39 +59,3 @@ class Store:
     @property
     def carts(self) -> CartStore:
         return self._carts
-
-    @staticmethod
-    def _from_dicts(obj_type, objs: dict[int, dict]):
-        return {int(key): obj_type.from_dict(obj) for key, obj in objs.items()}
-
-    @staticmethod
-    def _to_dicts(objs: dict):
-        return {key: obj.to_dict() for key, obj in objs.items()}
-
-    def load_from_file(self):
-        if pathlib.Path(JSON_PATH).exists():
-            with open(JSON_PATH, "r") as f:
-                data = json.load(f)
-        else:
-            data = {
-                "items": {},
-                "carts": {},
-            }
-
-        self._items = ItemStore(self._from_dicts(Item, data["items"]))
-        self._carts = CartStore(self._from_dicts(Cart, data["carts"]))
-
-    def save_to_file(self):
-        with open(JSON_PATH, "w+") as f:
-            data = {
-                "items": self._to_dicts(self._items.dump),
-                "carts": self._to_dicts(self._carts.dump),
-            }
-            json.dump(data, f, indent=4)
-
-    def __enter__(self):
-        self.load_from_file()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.save_to_file()

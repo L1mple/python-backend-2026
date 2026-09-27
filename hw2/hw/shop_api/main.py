@@ -1,24 +1,12 @@
-from contextlib import asynccontextmanager
-
-from fastapi import FastAPI
-from starlette.requests import Request
-from starlette.responses import JSONResponse, PlainTextResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import PlainTextResponse
 
 from shop_api.exceptions import NotFoundError
 from shop_api.routers.items_router import router as item_router
 from shop_api.routers.carts_router import router as cart_router
 from shop_api.routers.chat_router import router as chat_router
-from shop_api.storage import Store
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    with Store() as store:
-        app.state.store = store
-        yield
-
-
-app = FastAPI(title="Shop API", lifespan=lifespan)
+app = FastAPI(title="Shop API")
 
 
 @app.exception_handler(NotFoundError)

@@ -7,6 +7,8 @@ from shop_api.storage import Store
 
 
 def get_storage(request: Request) -> Store:
+    if 'store' not in request.app.state:
+        request.app.state.store = Store()
     return request.app.state.store
 
 

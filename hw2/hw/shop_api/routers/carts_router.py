@@ -1,9 +1,8 @@
 from typing import Annotated
 
-from fastapi import APIRouter
+from fastapi import APIRouter, status
 from fastapi.params import Query
-from starlette import status
-from starlette.responses import JSONResponse
+from fastapi.responses import JSONResponse
 
 from shop_api.deps import CartServiceDep
 from shop_api.schema import CartFiltersSchema, CartSchema
