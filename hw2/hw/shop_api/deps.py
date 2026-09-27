@@ -1,9 +1,8 @@
 from typing import Annotated
 
-from fastapi import Depends
-from starlette.requests import Request
+from fastapi import Depends, Request, WebSocket
 
-from shop_api.service import ItemService, CartService
+from shop_api.service import ItemService, CartService, ChatService
 from shop_api.storage import Store
 
 
@@ -26,3 +25,12 @@ def get_cart_service(store: StoreDep) -> CartService:
 
 
 type CartServiceDep = Annotated[CartService, Depends(get_cart_service)]
+
+
+def get_chat_service(websocket: WebSocket) -> ChatService:
+    if not hasattr(websocket.app.state, 'chat_service'):
+        websocket.app.state.chat_service = ChatService()
+    return websocket.app.state.chat_service
+
+
+type ChatServiceDep = Annotated[ChatService, Depends(get_chat_service)]

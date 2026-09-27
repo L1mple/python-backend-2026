@@ -1,7 +1,15 @@
+from random import choices
+from string import ascii_lowercase
+
+from fastapi import WebSocket
+
 from shop_api.exceptions import NotFoundError
 from shop_api.models import Item, Cart, FullCart, CartItem
-from shop_api.schema import ItemFiltersSchema, ItemSchema, ItemCreateSchema, ItemPatchSchema, CartSchema, \
-    CartFiltersSchema, CartItemSchema
+from shop_api.schema import (
+    ItemFiltersSchema, CartFiltersSchema,
+    ItemSchema, ItemCreateSchema, ItemPatchSchema,
+    CartSchema, CartItemSchema,
+)
 from shop_api.storage import Store
 
 
@@ -148,3 +156,35 @@ class CartService:
         cart.items[item_id] = cart.items.get(item_id, 0) + 1
         full_cart = self._to_full(cart)
         return self._to_schema(full_cart)
+
+
+class ChatService:
+    _chats: dict[str, list[WebSocket]]
+
+    def __init__(self):
+        self._chats = {}
+
+    @staticmethod
+    def generate_username() -> str:
+        return ''.join(choices(ascii_lowercase, k=10))
+
+
+    async def subscribe(self, chat_name: str, ws: WebSocket):
+        await ws.accept()
+        if chat_name not in self._chats:
+            self._chats[chat_name] = []
+        self._chats[chat_name].append(ws)
+
+    def unsubscribe(self, chat_name: str, ws: WebSocket):
+        if chat_name in self._chats:
+            self._chats[chat_name].remove(ws)
+
+    async def publish(self, chat_name, username, message):
+        if chat_name not in self._chats:
+            return
+        for ws in self._chats[chat_name]:
+            await ws.send_text(f'{username} :: {message}')
+
+
+
+
