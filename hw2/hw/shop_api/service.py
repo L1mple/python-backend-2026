@@ -38,9 +38,9 @@ class ItemService:
         if not filters.show_deleted:
             filtered = (item for item in filtered if item.deleted == filters.show_deleted)
 
-        if filters.min_price:
+        if filters.min_price is not None:
             filtered = [item for item in filtered if item.price >= filters.min_price]
-        if filters.max_price:
+        if filters.max_price is not None:
             filtered = [item for item in filtered if item.price <= filters.max_price]
 
         page = list(filtered)[filters.offset:filters.offset + filters.limit]
@@ -126,14 +126,14 @@ class CartService:
             key=lambda cart: cart.id
         )
 
-        if filters.min_price:
+        if filters.min_price is not None:
             filtered = [cart for cart in filtered if cart.price >= filters.min_price]
-        if filters.max_price:
+        if filters.max_price is not None:
             filtered = [cart for cart in filtered if cart.price <= filters.max_price]
 
-        if filters.min_quantity:
+        if filters.min_quantity is not None:
             filtered = [cart for cart in filtered if cart.quantity >= filters.min_quantity]
-        if filters.max_quantity:
+        if filters.max_quantity is not None:
             filtered = [cart for cart in filtered if cart.quantity <= filters.max_quantity]
 
         page = list(filtered)[filters.offset:filters.offset + filters.limit]
