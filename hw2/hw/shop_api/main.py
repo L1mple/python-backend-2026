@@ -203,7 +203,6 @@ def delete_item(item_id: int) -> dict[str, int]:
 
 @app.websocket("/chat/{chat_name}")
 async def chat(websocket: WebSocket, chat_name: str) -> None:
-    """Broadcast each message to the other users in the same chat room."""
     await websocket.accept()
     username = uuid4().hex[:8]
     members = chat_connections.setdefault(chat_name, [])
