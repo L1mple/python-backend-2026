@@ -1,11 +1,18 @@
-"""In-memory REST API for the homework shop."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Optional
+from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException, Query, Response, status
+from fastapi import (
+    FastAPI,
+    HTTPException,
+    Query,
+    Response,
+    WebSocket,
+    WebSocketDisconnect,
+    status,
+)
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -64,6 +71,7 @@ items: dict[int, StoredItem] = {}
 carts: dict[int, StoredCart] = {}
 next_item_id = 1
 next_cart_id = 1
+chat_connections: dict[str, list[WebSocket]] = {}
 
 
 def get_item_or_404(item_id: int, *, include_deleted: bool = False) -> StoredItem:
@@ -191,3 +199,25 @@ def delete_item(item_id: int) -> dict[str, int]:
     item = get_item_or_404(item_id, include_deleted=True)
     item.deleted = True
     return {"id": item.id}
+
+
+@app.websocket("/chat/{chat_name}")
+async def chat(websocket: WebSocket, chat_name: str) -> None:
+    """Broadcast each message to the other users in the same chat room."""
+    await websocket.accept()
+    username = uuid4().hex[:8]
+    members = chat_connections.setdefault(chat_name, [])
+    members.append(websocket)
+
+    try:
+        while True:
+            message = await websocket.receive_text()
+            for member in members.copy():
+                if member is not websocket:
+                    await member.send_text(f"{username} :: {message}")
+    except WebSocketDisconnect:
+        pass
+    finally:
+        members.remove(websocket)
+        if not members:
+            del chat_connections[chat_name]
