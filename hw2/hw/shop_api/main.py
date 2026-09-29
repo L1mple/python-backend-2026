@@ -28,8 +28,25 @@ class PatchItemRequest(BaseModel):
     price: NonNegativeFloat | None = None
 
 
+class CartItem(BaseModel):
+    id: int
+    name: str
+    quantity: int
+    available: bool
+
+
+class Cart(BaseModel):
+    id: int
+    items: list[CartItem]
+    price: float
+
+
 items: dict[int, Item] = {}
 item_ids = count(1)
+
+# cart_id -> {item_id: adet}
+carts: dict[int, dict[int, int]] = {}
+cart_ids = count(1)
 
 
 def get_item_or_404(item_id: int) -> Item:
@@ -102,3 +119,73 @@ def delete_item(item_id: int) -> Item:
     # gercekten silmiyoruz, sadece isaretliyoruz
     item.deleted = True
     return item
+
+
+def build_cart(cart_id: int) -> Cart:
+    cart_items = []
+    price = 0.0
+    for item_id, quantity in carts[cart_id].items():
+        item = items[item_id]
+        cart_items.append(
+            CartItem(
+                id=item.id,
+                name=item.name,
+                quantity=quantity,
+                available=not item.deleted,
+            )
+        )
+        # silinen urun fiyata eklenmesin
+        if not item.deleted:
+            price += item.price * quantity
+    return Cart(id=cart_id, items=cart_items, price=price)
+
+
+@app.post("/cart", status_code=HTTPStatus.CREATED)
+def create_cart(response: Response) -> dict[str, int]:
+    cart_id = next(cart_ids)
+    carts[cart_id] = {}
+    response.headers["location"] = f"/cart/{cart_id}"
+    return {"id": cart_id}
+
+
+@app.get("/cart/{cart_id}")
+def get_cart(cart_id: int) -> Cart:
+    if cart_id not in carts:
+        raise HTTPException(HTTPStatus.NOT_FOUND, f"Cart {cart_id} not found")
+    return build_cart(cart_id)
+
+
+@app.get("/cart")
+def get_carts(
+    offset: Annotated[NonNegativeInt, Query()] = 0,
+    limit: Annotated[PositiveInt, Query()] = 10,
+    min_price: Annotated[NonNegativeFloat | None, Query()] = None,
+    max_price: Annotated[NonNegativeFloat | None, Query()] = None,
+    min_quantity: Annotated[NonNegativeInt | None, Query()] = None,
+    max_quantity: Annotated[NonNegativeInt | None, Query()] = None,
+) -> list[Cart]:
+    result = []
+    for cart_id in carts:
+        cart = build_cart(cart_id)
+        quantity = sum(item.quantity for item in cart.items)
+        if min_price is not None and cart.price < min_price:
+            continue
+        if max_price is not None and cart.price > max_price:
+            continue
+        if min_quantity is not None and quantity < min_quantity:
+            continue
+        if max_quantity is not None and quantity > max_quantity:
+            continue
+        result.append(cart)
+    return result[offset : offset + limit]
+
+
+@app.post("/cart/{cart_id}/add/{item_id}")
+def add_to_cart(cart_id: int, item_id: int) -> Cart:
+    if cart_id not in carts:
+        raise HTTPException(HTTPStatus.NOT_FOUND, f"Cart {cart_id} not found")
+    get_item_or_404(item_id)
+
+    cart = carts[cart_id]
+    cart[item_id] = cart.get(item_id, 0) + 1
+    return build_cart(cart_id)
