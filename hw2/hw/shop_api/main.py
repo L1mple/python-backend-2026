@@ -25,7 +25,7 @@ class ItemCreate(BaseModel):
 
 
 class ItemUpdate(ItemCreate):
-    """A complete replacement has the same required fields as creation."""
+    pass
 
 
 class ItemPatch(BaseModel):
