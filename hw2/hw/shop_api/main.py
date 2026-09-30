@@ -1,5 +1,3 @@
-from typing import Annotated
-
 from fastapi import FastAPI, HTTPException, Query, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -45,14 +43,8 @@ class Cart(BaseModel):
     price: float
 
 
-# Data is kept in memory for the lifetime of the server process.
 items: dict[int, Item] = {}
 carts: dict[int, dict[int, int]] = {}
-
-Offset = Annotated[int, Query(ge=0)]
-Limit = Annotated[int, Query(gt=0)]
-PriceFilter = Annotated[float | None, Query(ge=0, allow_inf_nan=False)]
-QuantityFilter = Annotated[int | None, Query(ge=0)]
 
 
 def find_item(item_id: int, include_deleted: bool = False) -> Item:
@@ -95,10 +87,10 @@ async def create_item(body: ItemData, response: Response) -> Item:
 
 @app.get("/item")
 async def list_items(
-    offset: Offset = 0,
-    limit: Limit = 10,
-    min_price: PriceFilter = None,
-    max_price: PriceFilter = None,
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=10, gt=0),
+    min_price: float | None = Query(default=None, ge=0, allow_inf_nan=False),
+    max_price: float | None = Query(default=None, ge=0, allow_inf_nan=False),
     show_deleted: bool = False,
 ) -> list[Item]:
     result = [
@@ -150,12 +142,12 @@ async def create_cart(response: Response) -> dict[str, int]:
 
 @app.get("/cart")
 async def list_carts(
-    offset: Offset = 0,
-    limit: Limit = 10,
-    min_price: PriceFilter = None,
-    max_price: PriceFilter = None,
-    min_quantity: QuantityFilter = None,
-    max_quantity: QuantityFilter = None,
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=10, gt=0),
+    min_price: float | None = Query(default=None, ge=0, allow_inf_nan=False),
+    max_price: float | None = Query(default=None, ge=0, allow_inf_nan=False),
+    min_quantity: int | None = Query(default=None, ge=0),
+    max_quantity: int | None = Query(default=None, ge=0),
 ) -> list[Cart]:
     result = []
     for cart_id in carts:
