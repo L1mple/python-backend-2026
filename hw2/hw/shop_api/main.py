@@ -17,6 +17,7 @@ from pydantic import (
     NonNegativeFloat,
     NonNegativeInt,
     PositiveInt,
+    field_validator,
 )
 
 
@@ -35,6 +36,13 @@ class ItemPatchRequest(BaseModel):
     price: NonNegativeFloat | None = None
 
     model_config = ConfigDict(extra="forbid")
+
+    @field_validator("name", "price")
+    @classmethod
+    def reject_null(cls, value: str | float | None) -> str | float:
+        if value is None:
+            raise ValueError("Field cannot be null")
+        return value
 
 
 class ItemResponse(ItemRequest):
