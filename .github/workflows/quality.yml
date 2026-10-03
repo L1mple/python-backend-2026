@@ -1,0 +1,46 @@
+name: Homework quality checks
+
+on:
+  push:
+    paths:
+      - 'hw1/app.py'
+      - 'hw2/hw/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'Makefile'
+      - '.github/workflows/quality.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'hw1/app.py'
+      - 'hw2/hw/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'Makefile'
+      - '.github/workflows/quality.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        python-version: ['3.13', '3.14']
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install uv and locked dependencies
+        run: |
+          python -m pip install uv==0.9.17
+          uv sync --locked
+      - name: Check formatting, lint and types
+        run: make lint
+      - name: Run instructor and additional tests
+        run: make test

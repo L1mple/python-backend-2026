@@ -5,12 +5,15 @@ description = "Homework assignments for the Python Backend course"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "fastapi>=0.117.1",
     "uvicorn>=0.24.0",
+    "websockets>=15.0.1",
 ]
 
 [dependency-groups]
 dev = [
     "async-asgi-testclient>=1.4.11",
+    "faker>=37.8.0",
     "httpx>=0.27.2",
     "mypy>=1.18.0",
     "pre-commit>=4.3.0",
@@ -25,12 +28,13 @@ package = false
 [tool.pytest.ini_options]
 addopts = "-v --tb=short --strict-markers"
 asyncio_mode = "auto"
+pythonpath = ["hw2/hw"]
 markers = [
     "asyncio: marks tests as async",
 ]
 
 [tool.ruff]
-extend-exclude = ["hw*/test_*.py"]
+extend-exclude = ["hw*/test_*.py", "hw2/hw/test_homework2.py", "hw2/*_example"]
 line-length = 100
 target-version = "py313"
 
