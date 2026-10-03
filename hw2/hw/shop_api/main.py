@@ -420,6 +420,3 @@ def add_item_to_cart(
         items=items,
         price=total_price,
     )
-from fastapi import FastAPI
-
-app = FastAPI(title="Shop API")
