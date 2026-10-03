@@ -49,6 +49,7 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
+.ruff_cache/
 
 # Translations
 *.mo
@@ -82,6 +83,7 @@ ipython_config.py
 
 # pyenv
 .python-version
+!.python-version
 
 # pipenv
 Pipfile.lock
