@@ -31,6 +31,16 @@ def find_cart(cart_id: int) -> dict[int, int]:
     return store.carts[cart_id]
 
 
+def save_item(item: Item) -> Item:
+    try:
+        store.update_item(item)
+    except OverflowError as error:
+        raise HTTPException(
+            HTTPStatus.UNPROCESSABLE_ENTITY, "Cart price is too large"
+        ) from error
+    return item
+
+
 @app.post("/cart", status_code=HTTPStatus.CREATED)
 async def create_cart(response: Response) -> CartCreated:
     cart_id = next(store.cart_ids)
@@ -72,9 +82,14 @@ async def list_carts(
 
 @app.post("/cart/{cart_id}/add/{item_id}")
 async def add_to_cart(cart_id: int, item_id: int) -> Cart:
-    cart = find_cart(cart_id)
+    find_cart(cart_id)
     find_item(item_id)
-    cart[item_id] = cart.get(item_id, 0) + 1
+    try:
+        store.add_to_cart(cart_id, item_id)
+    except OverflowError as error:
+        raise HTTPException(
+            HTTPStatus.UNPROCESSABLE_ENTITY, "Cart price is too large"
+        ) from error
     return store.get_cart(cart_id)
 
 
@@ -113,8 +128,7 @@ async def list_items(
 async def replace_item(item_id: int, data: ItemData) -> Item:
     find_item(item_id, include_deleted=True)
     item = Item(id=item_id, **data.model_dump())
-    store.items[item_id] = item
-    return item
+    return save_item(item)
 
 
 @app.patch("/item/{item_id}", response_model=Item)
@@ -123,8 +137,7 @@ async def patch_item(item_id: int, data: ItemPatch) -> Item | Response:
     if item.deleted:
         return Response(status_code=HTTPStatus.NOT_MODIFIED)
     updated = item.model_copy(update=data.model_dump(exclude_unset=True))
-    store.items[item_id] = updated
-    return updated
+    return save_item(updated)
 
 
 @app.delete("/item/{item_id}")

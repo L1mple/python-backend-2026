@@ -2,7 +2,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-Price = Annotated[float, Field(ge=0, allow_inf_nan=False)]
+Price = Annotated[float, Field(strict=True, ge=0, allow_inf_nan=False)]
 Name = Annotated[str, Field(min_length=1)]
 
 
@@ -42,7 +42,7 @@ class CartItem(BaseModel):
 class Cart(BaseModel):
     id: int
     items: list[CartItem]
-    price: float
+    price: Price
 
 
 class CartCreated(BaseModel):

@@ -1,6 +1,7 @@
 from uuid import uuid4
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi.websockets import WebSocketState
 
 router = APIRouter()
 rooms: dict[str, set[WebSocket]] = {}
@@ -18,9 +19,15 @@ async def chat(websocket: WebSocket, chat_name: str) -> None:
             for recipient in tuple(room):
                 if recipient is websocket:
                     continue
+                if (
+                    recipient.application_state != WebSocketState.CONNECTED
+                    or recipient.client_state != WebSocketState.CONNECTED
+                ):
+                    room.discard(recipient)
+                    continue
                 try:
                     await recipient.send_text(f"{username} :: {message}")
-                except (WebSocketDisconnect, OSError, RuntimeError):
+                except (WebSocketDisconnect, OSError):
                     room.discard(recipient)
     except WebSocketDisconnect:
         pass
