@@ -22,6 +22,68 @@ async def send_json(send, status: int, data: dict[str, Any], headers=()):
     await send({"type": "http.response.body", "body": body})
 
 
+async def handle_factorial(scope, receive, send):
+    query = parse_qs(
+        scope.get("query_string", b"").decode("utf-8"),
+        keep_blank_values=True,
+    )
+    n = int(query.get("n", [""])[-1])
+    if n < 0:
+        await send_json(
+            send, HTTPStatus.BAD_REQUEST, {"detail": "n must be non-negative"}
+        )
+        return
+
+    await send_json(send, HTTPStatus.OK, {"result": math.factorial(n)})
+
+
+async def handle_fibonacci(scope, receive, send):
+    n = int(scope["path"].rsplit("/", 1)[1])
+    if n < 0:
+        await send_json(
+            send, HTTPStatus.BAD_REQUEST, {"detail": "n must be non-negative"}
+        )
+        return
+
+    a, b = 0, 1
+    for _ in range(n):
+        a, b = b, a + b
+
+    await send_json(send, HTTPStatus.OK, {"result": b})
+
+
+async def handle_mean(scope, receive, send):
+    body = bytearray()
+    while True:
+        message = await receive()
+        if message["type"] == "http.disconnect":
+            return
+        body.extend(message.get("body", b""))
+        if not message.get("more_body", False):
+            break
+
+    numbers = json.loads(body)
+    if not isinstance(numbers, list) or any(
+        type(number) not in (int, float) or not math.isfinite(number)
+        for number in numbers
+    ):
+        raise ValueError
+
+    if not numbers:
+        await send_json(
+            send,
+            HTTPStatus.BAD_REQUEST,
+            {"detail": "Body must be a non-empty array of numbers"},
+        )
+        return
+
+    result = float(mean(numbers))
+    if not math.isfinite(result):
+        raise ValueError
+
+    await send_json(send, HTTPStatus.OK, {"result": result})
+
+
 async def application(
     scope: dict[str, Any],
     receive: Callable[[], Awaitable[dict[str, Any]]],
@@ -39,13 +101,16 @@ async def application(
     if scope["type"] != "http":
         return
 
-    path = scope["path"]
-    parts = path.split("/")
-    is_fibonacci = len(parts) == 3 and parts[1] == "fibonacci" and bool(parts[2])
-
-    if path not in ("/factorial", "/mean") and not is_fibonacci:
-        await send_json(send, HTTPStatus.NOT_FOUND, {"detail": "Not Found"})
-        return
+    match scope["path"].split("/"):
+        case ["", "factorial"]:
+            handler = handle_factorial
+        case ["", "fibonacci", n] if n:
+            handler = handle_fibonacci
+        case ["", "mean"]:
+            handler = handle_mean
+        case _:
+            await send_json(send, HTTPStatus.NOT_FOUND, {"detail": "Not Found"})
+            return
 
     if scope["method"] != "GET":
         await send_json(
@@ -57,68 +122,13 @@ async def application(
         return
 
     try:
-        if path == "/mean":
-            body = bytearray()
-            while True:
-                message = await receive()
-                if message["type"] == "http.disconnect":
-                    return
-                body.extend(message.get("body", b""))
-                if not message.get("more_body", False):
-                    break
-
-            numbers = json.loads(body)
-            if not isinstance(numbers, list) or any(
-                type(number) not in (int, float) or not math.isfinite(number)
-                for number in numbers
-            ):
-                raise ValueError
-
-            if not numbers:
-                await send_json(
-                    send,
-                    HTTPStatus.BAD_REQUEST,
-                    {"detail": "Body must be a non-empty array of numbers"},
-                )
-                return
-
-            result = float(mean(numbers))
-            if not math.isfinite(result):
-                raise ValueError
-        else:
-            if is_fibonacci:
-                n = int(parts[2])
-            else:
-                query = parse_qs(
-                    scope.get("query_string", b"").decode("utf-8"),
-                    keep_blank_values=True,
-                )
-                n = int(query.get("n", [""])[-1])
-
-            if n < 0:
-                await send_json(
-                    send,
-                    HTTPStatus.BAD_REQUEST,
-                    {"detail": "n must be non-negative"},
-                )
-                return
-
-            if is_fibonacci:
-                a, b = 0, 1
-                for _ in range(n):
-                    a, b = b, a + b
-                result = b
-            else:
-                result = math.factorial(n)
-
-        await send_json(send, HTTPStatus.OK, {"result": result})
+        await handler(scope, receive, send)
     except (ValueError, OverflowError):
         await send_json(
             send,
             HTTPStatus.UNPROCESSABLE_ENTITY,
             {"detail": "Invalid request parameters"},
         )
-        return
 
 
 if __name__ == "__main__":
