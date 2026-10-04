@@ -1,422 +1,293 @@
-from fastapi import (
-    FastAPI,
-    Depends,
-    status,
-    Response,
-    HTTPException,
-    Query,
-)
-from sqlalchemy.orm import Session
-
-from .database import SessionLocal
-from .models import Item, Cart, CartItem
-from .schemas import (
-    ItemCreate,
-    ItemResponse,
-    ItemPatch,
-    CartResponse,
-    CartItemResponse,
-)
+from fastapi import FastAPI, HTTPException, Query, Response
+from pydantic import BaseModel, ConfigDict, Field
 
 
 app = FastAPI(title="Shop API")
 
 
-def get_db():
-    db: Session = SessionLocal()
-
-    try:
-        yield db
-    finally:
-        db.close()
+items: dict[int, dict] = {}
+carts: dict[int, dict[int, int]] = {}
 
 
-# ============================================================
-# ITEM
-# ============================================================
+class ItemCreate(BaseModel):
+    name: str
+    price: float = Field(ge=0, allow_inf_nan=False)
+
+    model_config = ConfigDict(extra="forbid")
 
 
-@app.post(
-    "/item",
-    response_model=ItemResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-def create_item(
-    item: ItemCreate,
+class ItemPut(BaseModel):
+    name: str
+    price: float = Field(ge=0, allow_inf_nan=False)
+    deleted: bool = False
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ItemPatch(BaseModel):
+    name: str | None = None
+    price: float | None = Field(
+        default=None,
+        ge=0,
+        allow_inf_nan=False,
+    )
+
+    model_config = ConfigDict(extra="forbid")
+
+
+def get_item_or_404(item_id: int) -> dict:
+    item = items.get(item_id)
+
+    if item is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Item not found",
+        )
+
+    return item
+
+
+def get_available_item_or_404(item_id: int) -> dict:
+    item = get_item_or_404(item_id)
+
+    if item["deleted"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Item not found",
+        )
+
+    return item
+
+
+def get_cart_or_404(cart_id: int) -> dict[int, int]:
+    cart = carts.get(cart_id)
+
+    if cart is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Cart not found",
+        )
+
+    return cart
+
+
+def build_cart(cart_id: int) -> dict:
+    cart = get_cart_or_404(cart_id)
+
+    cart_items = []
+    total_price = 0.0
+
+    for item_id, quantity in cart.items():
+        item = items[item_id]
+
+        available = not item["deleted"]
+
+        cart_items.append(
+            {
+                "id": item_id,
+                "name": item["name"],
+                "quantity": quantity,
+                "available": available,
+            }
+        )
+
+        if available:
+            total_price += item["price"] * quantity
+
+    return {
+        "id": cart_id,
+        "items": cart_items,
+        "price": total_price,
+    }
+
+
+@app.post("/item", status_code=201)
+async def create_item(
+    body: ItemCreate,
     response: Response,
-    db: Session = Depends(get_db),
 ):
-    new_item = Item(
-        name=item.name,
-        price=item.price,
-    )
+    item_id = len(items) + 1
 
-    db.add(new_item)
-    db.commit()
-    db.refresh(new_item)
+    item = {
+        "id": item_id,
+        "name": body.name,
+        "price": body.price,
+        "deleted": False,
+    }
 
-    response.headers["Location"] = f"/item/{new_item.id}"
+    items[item_id] = item
 
-    return new_item
-
-
-@app.get(
-    "/item/{item_id}",
-    response_model=ItemResponse,
-)
-def get_item(
-    item_id: int,
-    db: Session = Depends(get_db),
-):
-    item = db.get(Item, item_id)
-
-    if item is None or item.deleted:
-        raise HTTPException(
-            status_code=404,
-            detail="Item not found",
-        )
+    response.headers["Location"] = f"/item/{item_id}"
 
     return item
 
 
-@app.get(
-    "/item",
-    response_model=list[ItemResponse],
-)
-def get_items(
-    offset: int = Query(0, ge=0),
-    limit: int = Query(10, gt=0),
-    min_price: float | None = Query(None, ge=0),
-    max_price: float | None = Query(None, ge=0),
+@app.get("/item/{item_id}")
+async def get_item(item_id: int):
+    return get_available_item_or_404(item_id)
+
+
+@app.get("/item")
+async def get_items(
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=10, gt=0),
+    min_price: float | None = Query(
+        default=None,
+        ge=0,
+        allow_inf_nan=False,
+    ),
+    max_price: float | None = Query(
+        default=None,
+        ge=0,
+        allow_inf_nan=False,
+    ),
     show_deleted: bool = False,
-    db: Session = Depends(get_db),
 ):
-    query = db.query(Item)
+    result = []
 
-    if not show_deleted:
-        query = query.filter(Item.deleted == False)
+    for item in items.values():
+        if item["deleted"] and not show_deleted:
+            continue
 
-    if min_price is not None:
-        query = query.filter(Item.price >= min_price)
+        if min_price is not None and item["price"] < min_price:
+            continue
 
-    if max_price is not None:
-        query = query.filter(Item.price <= max_price)
+        if max_price is not None and item["price"] > max_price:
+            continue
 
-    items = (
-        query
-        .offset(offset)
-        .limit(limit)
-        .all()
-    )
+        result.append(item)
 
-    return items
+    return result[offset : offset + limit]
 
 
-@app.put(
-    "/item/{item_id}",
-    response_model=ItemResponse,
-)
-def update_item(
+@app.put("/item/{item_id}")
+async def replace_item(
     item_id: int,
-    item_data: ItemCreate,
-    db: Session = Depends(get_db),
+    body: ItemPut,
 ):
-    item = db.get(Item, item_id)
+    get_item_or_404(item_id)
 
-    if item is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Item not found",
-        )
+    item = {
+        "id": item_id,
+        "name": body.name,
+        "price": body.price,
+        "deleted": body.deleted,
+    }
 
-    item.name = item_data.name
-    item.price = item_data.price
-
-    db.commit()
-    db.refresh(item)
+    items[item_id] = item
 
     return item
 
 
-@app.patch(
-    "/item/{item_id}",
-    response_model=ItemResponse,
-)
-def patch_item(
+@app.patch("/item/{item_id}")
+async def patch_item(
     item_id: int,
-    item_data: ItemPatch,
-    db: Session = Depends(get_db),
+    body: ItemPatch,
 ):
-    item = db.get(Item, item_id)
+    item = get_item_or_404(item_id)
 
-    if item is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Item not found",
-        )
-
-    if item.deleted:
+    if item["deleted"]:
         return Response(status_code=304)
 
-    if item_data.name is not None:
-        item.name = item_data.name
+    if "name" in body.model_fields_set:
+        if body.name is None:
+            raise HTTPException(
+                status_code=422,
+                detail="Name cannot be null",
+            )
 
-    if item_data.price is not None:
-        item.price = item_data.price
+        item["name"] = body.name
 
-    db.commit()
-    db.refresh(item)
+    if "price" in body.model_fields_set:
+        if body.price is None:
+            raise HTTPException(
+                status_code=422,
+                detail="Price cannot be null",
+            )
+
+        item["price"] = body.price
 
     return item
 
 
 @app.delete("/item/{item_id}")
-def delete_item(
-    item_id: int,
-    db: Session = Depends(get_db),
+async def delete_item(item_id: int):
+    item = get_item_or_404(item_id)
+
+    item["deleted"] = True
+
+    return Response(status_code=200)
+
+
+@app.post("/cart", status_code=201)
+async def create_cart(response: Response):
+    cart_id = len(carts) + 1
+
+    carts[cart_id] = {}
+
+    response.headers["Location"] = f"/cart/{cart_id}"
+
+    return {"id": cart_id}
+
+
+@app.get("/cart/{cart_id}")
+async def get_cart(cart_id: int):
+    return build_cart(cart_id)
+
+
+@app.get("/cart")
+async def get_carts(
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=10, gt=0),
+    min_price: float | None = Query(
+        default=None,
+        ge=0,
+        allow_inf_nan=False,
+    ),
+    max_price: float | None = Query(
+        default=None,
+        ge=0,
+        allow_inf_nan=False,
+    ),
+    min_quantity: int | None = Query(default=None, ge=0),
+    max_quantity: int | None = Query(default=None, ge=0),
 ):
-    item = db.get(Item, item_id)
-
-    if item is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Item not found",
-        )
-
-    item.deleted = True
-
-    db.commit()
-
-    return {"id": item.id}
-
-
-# ============================================================
-# CART
-# ============================================================
-
-
-@app.post(
-    "/cart",
-    status_code=status.HTTP_201_CREATED,
-)
-def create_cart(
-    response: Response,
-    db: Session = Depends(get_db),
-):
-    cart = Cart()
-
-    db.add(cart)
-    db.commit()
-    db.refresh(cart)
-
-    response.headers["Location"] = f"/cart/{cart.id}"
-
-    return {"id": cart.id}
-
-
-@app.get(
-    "/cart/{cart_id}",
-    response_model=CartResponse,
-)
-def get_cart(
-    cart_id: int,
-    db: Session = Depends(get_db),
-):
-    cart = db.get(Cart, cart_id)
-
-    if cart is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Cart not found",
-        )
-
-    cart_items = (
-        db.query(CartItem, Item)
-        .join(Item, CartItem.item_id == Item.id)
-        .filter(CartItem.cart_id == cart_id)
-        .all()
-    )
-
-    items = []
-    total_price = 0.0
-
-    for cart_item, item in cart_items:
-        available = not item.deleted
-
-        if available:
-            total_price += float(item.price) * cart_item.quantity
-
-        items.append(
-            CartItemResponse(
-                id=item.id,
-                name=item.name,
-                quantity=cart_item.quantity,
-                available=available,
-            )
-        )
-
-    return CartResponse(
-        id=cart.id,
-        items=items,
-        price=total_price,
-    )
-
-
-@app.get(
-    "/cart",
-    response_model=list[CartResponse],
-)
-def get_carts(
-    offset: int = Query(0, ge=0),
-    limit: int = Query(10, gt=0),
-    min_price: float | None = Query(None, ge=0),
-    max_price: float | None = Query(None, ge=0),
-    min_quantity: int | None = Query(None, ge=0),
-    max_quantity: int | None = Query(None, ge=0),
-    db: Session = Depends(get_db),
-):
-    carts = (
-        db.query(Cart)
-        .offset(offset)
-        .limit(limit)
-        .all()
-    )
-
     result = []
 
-    for cart in carts:
-        cart_items = (
-            db.query(CartItem, Item)
-            .join(Item, CartItem.item_id == Item.id)
-            .filter(CartItem.cart_id == cart.id)
-            .all()
+    for cart_id in carts:
+        cart = build_cart(cart_id)
+
+        quantity = sum(
+            item["quantity"]
+            for item in cart["items"]
         )
 
-        items = []
-        total_price = 0.0
-        total_quantity = 0
-
-        for cart_item, item in cart_items:
-            available = not item.deleted
-
-            total_quantity += cart_item.quantity
-
-            if available:
-                total_price += (
-                    float(item.price) * cart_item.quantity
-                )
-
-            items.append(
-                CartItemResponse(
-                    id=item.id,
-                    name=item.name,
-                    quantity=cart_item.quantity,
-                    available=available,
-                )
-            )
-
-        if min_price is not None and total_price < min_price:
+        if min_price is not None and cart["price"] < min_price:
             continue
 
-        if max_price is not None and total_price > max_price:
+        if max_price is not None and cart["price"] > max_price:
             continue
 
-        if (
-            min_quantity is not None
-            and total_quantity < min_quantity
-        ):
+        if min_quantity is not None and quantity < min_quantity:
             continue
 
-        if (
-            max_quantity is not None
-            and total_quantity > max_quantity
-        ):
+        if max_quantity is not None and quantity > max_quantity:
             continue
 
-        result.append(
-            CartResponse(
-                id=cart.id,
-                items=items,
-                price=total_price,
-            )
-        )
+        result.append(cart)
 
-    return result
+    return result[offset : offset + limit]
 
 
-@app.post(
-    "/cart/{cart_id}/add/{item_id}",
-    response_model=CartResponse,
-)
-def add_item_to_cart(
+@app.post("/cart/{cart_id}/add/{item_id}")
+async def add_item_to_cart(
     cart_id: int,
     item_id: int,
-    db: Session = Depends(get_db),
 ):
-    cart = db.get(Cart, cart_id)
+    cart = get_cart_or_404(cart_id)
 
-    if cart is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Cart not found",
-        )
+    get_available_item_or_404(item_id)
 
-    item = db.get(Item, item_id)
+    cart[item_id] = cart.get(item_id, 0) + 1
 
-    if item is None or item.deleted:
-        raise HTTPException(
-            status_code=404,
-            detail="Item not found",
-        )
-
-    cart_item = (
-        db.query(CartItem)
-        .filter(
-            CartItem.cart_id == cart_id,
-            CartItem.item_id == item_id,
-        )
-        .first()
-    )
-
-    if cart_item is None:
-        cart_item = CartItem(
-            cart_id=cart_id,
-            item_id=item_id,
-            quantity=1,
-        )
-        db.add(cart_item)
-    else:
-        cart_item.quantity += 1
-
-    db.commit()
-
-    cart_items = (
-        db.query(CartItem, Item)
-        .join(Item, CartItem.item_id == Item.id)
-        .filter(CartItem.cart_id == cart_id)
-        .all()
-    )
-
-    items = []
-    total_price = 0.0
-
-    for cart_item, item in cart_items:
-        available = not item.deleted
-
-        if available:
-            total_price += float(item.price) * cart_item.quantity
-
-        items.append(
-            CartItemResponse(
-                id=item.id,
-                name=item.name,
-                quantity=cart_item.quantity,
-                available=available,
-            )
-        )
-
-    return CartResponse(
-        id=cart.id,
-        items=items,
-        price=total_price,
-    )
+    return build_cart(cart_id)
