@@ -22,9 +22,9 @@ async def send_response(send: Callable, status: int, data: dict | None = None):
     })
 
 async def application(
-        scope: dict[str, Any],
-        receive: Callable[[], Awaitable[dict[str, Any]]],
-        send: Callable[[dict[str, Any]], Awaitable[None]],
+    scope: dict[str, Any],
+    receive: Callable[[], Awaitable[dict[str, Any]]],
+    send: Callable[[dict[str, Any]], Awaitable[None]],
 ):
     """
     Args:
