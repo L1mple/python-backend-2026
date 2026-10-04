@@ -1,22 +1,34 @@
 from fastapi import FastAPI,  Query, HTTPException
-from pydantic import BaseModel
+from fastapi.responses import JSONResponse
+from http import HTTPStatus
+from pydantic import BaseModel, ConfigDict
 
 app = FastAPI(title="Shop API")
 class ItemToModify(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
     name: str | None = None
     price: float | None = None
 class ItemToCreate(BaseModel): # сущность товара
+    model_config = ConfigDict(extra='forbid')
+
     name: str
     price: float
 class Item(ItemToCreate): # сущность товара
+    model_config = ConfigDict(extra='forbid')
+
     id: int
     deleted: bool
 class CartItem(BaseModel): # сущность товаров в корзине
+    model_config = ConfigDict(extra='forbid')
+
     id: int
     name: str
     quantity: int
     available: bool
 class Cart(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
     id: int
     items: list[CartItem]
     price: float
@@ -35,7 +47,12 @@ def generate_key() -> int:
 async def create_cart() -> Cart:
     cart_id = generate_key()
     carts[cart_id] = Cart(id=cart_id, items=[], price=0.0)
-    return carts[cart_id]
+
+    return JSONResponse(
+        content=carts[cart_id].model_dump(),
+        status_code=HTTPStatus.CREATED,
+        headers={"Location": f"/cart/{cart_id}"}
+    )
 
 @app.get('/cart/{id}')
 async def get_cart(id: int) -> Cart:
@@ -47,8 +64,8 @@ async def get_cart(id: int) -> Cart:
 async def get_carts(
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=10, gt=0),
-    min_price: float | None = None,
-    max_price: float | None = None,
+    min_price: float | None = Query(default=None, ge=0),
+    max_price: float | None = Query(default=None, ge=0),
     min_quantity: int | None = Query(default=None, ge=0),
     max_quantity: int | None = Query(default=None, ge=0)
 ) -> list[Cart]:
@@ -102,7 +119,12 @@ async def create_item(item: ItemToCreate) -> Item:
     item_id = generate_key()
     current_item = Item(name=item.name, price=item.price, id=item_id, deleted=False)
     items[item_id] = current_item
-    return current_item
+
+    return JSONResponse(
+        status_code=HTTPStatus.CREATED,
+        content=current_item.model_dump(),
+        headers={"Location": f"/item/{item_id}"}
+    )
 
 @app.get('/item/{id}')
 async def get_item(id: int) -> Item:
@@ -114,8 +136,8 @@ async def get_item(id: int) -> Item:
 async def get_items(
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=10, gt=0),
-    min_price: float | None = None,
-    max_price: float | None = None,
+    min_price: float | None = Query(default=None, ge=0),
+    max_price: float | None =Query(default=None, ge=0),
     show_deleted: bool = False
 ) -> list[Item]:
 
@@ -151,8 +173,10 @@ async def replace_item(id: int, replacing_item: ItemToCreate) -> Item:
 
 @app.patch('/item/{id}')
 async def modify_item(id: int, modifying_item: ItemToModify) -> Item:
-
-    item = await get_item(id)
+    try:
+        item = await get_item(id)
+    except HTTPException:
+        raise HTTPException(status_code=HTTPStatus.NOT_MODIFIED)
 
     if modifying_item.name is not None:
         item.name = modifying_item.name
