@@ -18,7 +18,7 @@ async def post_item(body: ItemRequest) -> ItemResponse:
 @router.get("/{id}")
 async def get_item(id: int) -> ItemResponse:
     item = queries.get_item(id)
-    if item.deleted:
+    if item is None or item.deleted:
         raise HTTPException(HTTPStatus.NOT_FOUND)
     return ItemResponse.from_entity(item)
 
@@ -38,12 +38,16 @@ async def get_items(
 @router.put("/{id}")
 async def put_item(id: int, body: ItemRequest) -> ItemResponse:
     item = queries.update_item(id, body.name, body.price)
+    if item is None:
+        raise HTTPException(HTTPStatus.NOT_FOUND)
     return ItemResponse.from_entity(item)
 
 
 @router.patch("/{id}")
 async def patch_item(id: int, body: ItemPatchRequest) -> ItemResponse:
     item = queries.get_item(id)
+    if item is None:
+        raise HTTPException(HTTPStatus.NOT_FOUND)
     if item.deleted:
         raise HTTPException(HTTPStatus.NOT_MODIFIED)
     return ItemResponse.from_entity(queries.patch_item(id, body.name, body.price))
