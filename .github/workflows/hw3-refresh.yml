@@ -1,0 +1,51 @@
+name: Refresh HW3 dashboards
+
+on:
+  push:
+    branches:
+      - hw3-only
+    paths:
+      - .github/workflows/hw3-refresh.yml
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Apply update
+        run: unzip -o .github/workflows/hw3-update.zip
+
+      - name: Start monitoring stack
+        run: docker compose -f hw3/docker-compose.yml up --build -d --wait
+
+      - name: Generate traffic
+        run: python hw3/load_test.py --seconds 30
+
+      - name: Capture both Grafana dashboards
+        run: |
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+          python hw3/capture_dashboard.py
+
+      - name: Verify services and metrics
+        run: |
+          curl --fail http://localhost:8000/health
+          curl --fail http://localhost:8000/metrics | grep shop_items_created_total
+          curl --fail http://localhost:9090/-/ready
+          curl --fail http://localhost:3000/api/health
+
+      - name: Commit homework update
+        run: |
+          docker compose -f hw3/docker-compose.yml down
+          rm .github/workflows/hw3-refresh.yml
+          rm .github/workflows/hw3-update.zip
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Improve HW3 monitoring dashboards"
+          git push
