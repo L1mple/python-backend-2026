@@ -1,6 +1,6 @@
 from http import HTTPStatus
 from typing import Annotated
-from fastapi import APIRouter, Query, Response
+from fastapi import APIRouter, HTTPException, Query, Response
 from pydantic import NonNegativeFloat, NonNegativeInt, PositiveInt
 from .contracts import CartResponse
 from ...store import queries
@@ -19,6 +19,8 @@ async def post_cart(response: Response) -> dict[str, int]:
 @router.get("/{id}")
 async def get_cart(id: int) -> CartResponse:
     cart = queries.get_cart(id)
+    if cart is None:
+        raise HTTPException(HTTPStatus.NOT_FOUND)
     return CartResponse.from_entity(cart)
 
 
@@ -38,4 +40,6 @@ async def get_carts(
 @router.post("/{cart_id}/add/{item_id}")
 async def add_item_to_cart(cart_id: int, item_id: int) -> CartResponse:
     cart = queries.add_item_to_cart(cart_id, item_id)
+    if cart is None:
+        raise HTTPException(HTTPStatus.NOT_FOUND)
     return CartResponse.from_entity(cart)
