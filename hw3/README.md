@@ -1,8 +1,9 @@
 # Домашнее задание №3
 
 Shop API из второй домашней работы запускается вместе с Prometheus и Grafana.
-Метрики FastAPI доступны в `/metrics`, Prometheus собирает их каждые 5 секунд,
-а Grafana автоматически подключает источник данных и готовый дашборд.
+Метрики FastAPI и магазина доступны в `/metrics`, Prometheus собирает их каждые
+5 секунд, а Grafana автоматически подключает источник данных и два готовых
+дашборда.
 
 ## Запуск
 
@@ -16,7 +17,8 @@ docker compose up --build -d
 - Shop API и Swagger: <http://localhost:8000/docs>
 - метрики приложения: <http://localhost:8000/metrics>
 - Prometheus: <http://localhost:9090>
-- Grafana: <http://localhost:3000/d/shop-api/shop-api-monitoring>
+- Grafana, HTTP-метрики: <http://localhost:3000/d/shop-api/shop-api-monitoring>
+- Grafana, метрики магазина: <http://localhost:3000/d/shop-business/shop-business-metrics>
 
 Для наполнения графиков данными:
 
@@ -32,4 +34,10 @@ docker compose down
 
 ## Результат
 
-![Графики Shop API в Grafana](docs/grafana-dashboard.png)
+### HTTP-метрики
+
+![HTTP-метрики Shop API в Grafana](docs/grafana-dashboard.png)
+
+### Метрики магазина
+
+![Метрики магазина в Grafana](docs/grafana-business-dashboard.png)

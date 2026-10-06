@@ -1,3 +1,4 @@
 fastapi>=0.117.1,<1.0
 uvicorn[standard]>=0.24.0,<1.0
 prometheus-fastapi-instrumentator>=7.1.0,<8.0
+prometheus-client>=0.23.1,<1.0

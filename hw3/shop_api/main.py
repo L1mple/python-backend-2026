@@ -21,6 +21,14 @@ from pydantic import (
     field_validator,
 )
 
+from shop_api.monitoring import (
+    available_items,
+    cart_additions,
+    carts_created,
+    items_created,
+    stored_carts,
+)
+
 
 app = FastAPI(title="Shop API")
 Instrumentator().instrument(app).expose(app, include_in_schema=False)
@@ -118,6 +126,8 @@ async def health() -> dict[str, str]:
 async def create_cart(response: Response) -> dict[str, int]:
     cart_id = len(carts) + 1
     carts[cart_id] = {}
+    carts_created.inc()
+    stored_carts.set(len(carts))
     response.headers["location"] = f"/cart/{cart_id}"
     return {"id": cart_id}
 
@@ -166,6 +176,7 @@ async def add_item_to_cart(cart_id: int, item_id: int) -> CartResponse:
 
     cart = carts[cart_id]
     cart[item_id] = cart.get(item_id, 0) + 1
+    cart_additions.inc()
     return get_cart_response(cart_id)
 
 
@@ -174,6 +185,8 @@ async def create_item(info: ItemRequest, response: Response) -> ItemResponse:
     item_id = len(items) + 1
     item = Item(id=item_id, name=info.name, price=info.price)
     items[item_id] = item
+    items_created.inc()
+    available_items.set(sum(not stored_item.deleted for stored_item in items.values()))
     response.headers["location"] = f"/item/{item_id}"
     return get_item_response(item)
 
@@ -236,6 +249,7 @@ async def delete_item(item_id: int) -> Response:
     item = items.get(item_id)
     if item is not None:
         item.deleted = True
+        available_items.set(sum(not stored_item.deleted for stored_item in items.values()))
     return Response(status_code=HTTPStatus.OK)
 
 
