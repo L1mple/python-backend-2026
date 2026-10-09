@@ -4,9 +4,13 @@ from itertools import count
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query, Response, WebSocket, WebSocketDisconnect
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, ConfigDict
 
 app = FastAPI(title="Shop API")
+
+# hw3: экспортирует /metrics для Prometheus
+Instrumentator().instrument(app).expose(app)
 
 
 # --------------------------------------------------------------------------
