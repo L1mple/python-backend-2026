@@ -1,10 +1,13 @@
 from fastapi import FastAPI
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from .routes import router
 from .websocket import router as websocket_router
 
 
 app = FastAPI(title="Shop API")
+
+Instrumentator().instrument(app).expose(app)
 
 app.include_router(router)
 app.include_router(websocket_router)
