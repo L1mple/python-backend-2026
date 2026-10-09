@@ -2,6 +2,9 @@
 fastapi>=0.117.1
 uvicorn>=0.24.0
 prometheus-fastapi-instrumentator>=7.0.0
+sqlalchemy>=2.0.36
+pymysql>=1.1.1
+cryptography>=43.0.0
 
 # Зависимости для тестирования
 pytest>=7.4.0
