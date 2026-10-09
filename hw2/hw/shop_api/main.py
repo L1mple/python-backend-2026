@@ -1,9 +1,11 @@
 from fastapi import FastAPI, HTTPException, Query, Response
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 
 
 app = FastAPI(title="Shop API")
+Instrumentator().instrument(app).expose(app)
 
 class ItemBase(BaseModel):
     name: str
