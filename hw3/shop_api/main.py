@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional
 from uuid import uuid4
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from fastapi import (
     FastAPI,
@@ -17,7 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 app = FastAPI(title="Shop API")
-
+Instrumentator().instrument(app).expose(app)
 
 class ItemCreate(BaseModel):
     name: str = Field(min_length=1)
