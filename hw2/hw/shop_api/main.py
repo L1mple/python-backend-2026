@@ -1,7 +1,11 @@
 from fastapi import FastAPI, HTTPException, Query, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from prometheus_fastapi_instrumentator import Instrumentator
 
 app = FastAPI(title="Shop API")
+Instrumentator(excluded_handlers=["/metrics"]).instrument(app).expose(
+    app, include_in_schema=False
+)
 
 
 class ItemData(BaseModel):
