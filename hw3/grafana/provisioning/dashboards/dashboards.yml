@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: Homework 3
+    orgId: 1
+    folder: HW3
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/dashboards
