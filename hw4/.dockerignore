@@ -1,0 +1,13 @@
+**
+!requirements.txt
+!shop_api/
+!shop_api/**
+!transaction_demos/
+!transaction_demos/**
+!requirements-test.txt
+!db/
+!db/**
+!tests/
+!tests/**
+**/__pycache__/
+**/*.pyc
