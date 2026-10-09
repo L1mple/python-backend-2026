@@ -4,8 +4,11 @@ from http import HTTPStatus
 from fastapi import FastAPI, HTTPException, Query, WebSocket, Response, WebSocketDisconnect
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional
+from prometheus_fastapi_instrumentator import Instrumentator
 
 app = FastAPI(title="Shop API")
+
+Instrumentator().instrument(app).expose(app)
 
 class ItemCreate(BaseModel):
     name: str
