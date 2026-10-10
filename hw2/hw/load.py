@@ -12,7 +12,10 @@ item_ids = [
 
 for _ in range(3000):
     cart_id = client.post("/cart").json()["id"]
-    client.post(f"/cart/{cart_id}/add/{random.choice(item_ids)}")
+    for _ in range(random.randint(1, 3)):
+        client.post(f"/cart/{cart_id}/add/{random.choice(item_ids)}")
     client.get(f"/cart/{cart_id}")
-    client.get("/item", params={"limit": 5})
-    client.get(f"/item/{random.randint(1, 30)}")  # иногда 404
+    for _ in range(3):
+        client.get(f"/item/{random.randint(1, 30)}")  # иногда 404
+    if random.random() < 0.5:
+        client.get("/item", params={"limit": 5})
