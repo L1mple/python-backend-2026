@@ -19,6 +19,17 @@ services:
       timeout: 5s
       retries: 5
 
+  mysql:
+    image: mysql:8
+    container_name: hw4_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: hw4_db
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
   edgedb:
     image: edgedb/edgedb:5
     container_name: hw4_edgedb
@@ -31,4 +42,5 @@ services:
 
 volumes:
   postgres_data:
+  mysql_data:
   edgedb_data:
