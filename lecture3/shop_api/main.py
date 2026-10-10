@@ -2,9 +2,11 @@ from http import HTTPStatus
 from itertools import count
 
 from fastapi import FastAPI, HTTPException, Query, Response
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, ConfigDict
 
 app = FastAPI(title="Shop API")
+Instrumentator().instrument(app).expose(app)
 
 items_db: dict[int, "Item"] = {}
 carts_db: dict[int, dict[int, int]] = {}
