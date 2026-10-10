@@ -1,9 +1,16 @@
 from fastapi import FastAPI, Query, HTTPException
 from typing import Any, Annotated
 from http import HTTPStatus
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
+from prometheus_client import generate_latest
 
 app = FastAPI(title="Shop API")
+@app.get("/metrics")
+def metrics():
+    return Response(
+        content=generate_latest(),
+        media_type="text/plain",
+    )
 
 items: dict[int, dict[str, Any]] = {}
 next_item_id = 1
