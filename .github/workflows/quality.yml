@@ -1,9 +1,14 @@
-name: HW2 quality checks
+name: Homework quality checks
 
 on:
   push:
     paths:
       - 'hw2/hw/**'
+      - 'hw3/**'
+      - 'monitoring/**'
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'docker-compose.yml'
       - 'pyproject.toml'
       - 'uv.lock'
       - 'Makefile'
@@ -12,6 +17,11 @@ on:
     branches: [main]
     paths:
       - 'hw2/hw/**'
+      - 'hw3/**'
+      - 'monitoring/**'
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'docker-compose.yml'
       - 'pyproject.toml'
       - 'uv.lock'
       - 'Makefile'
@@ -42,3 +52,5 @@ jobs:
         run: make lint
       - name: Run instructor and additional tests
         run: make test
+      - name: Validate Docker Compose configuration
+        run: docker compose config --quiet

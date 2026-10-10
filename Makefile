@@ -1,4 +1,4 @@
-.PHONY: sync install test test-hw2 lint lint-ruff lint-mypy format run-hw2
+.PHONY: sync install test test-hw2 lint lint-ruff lint-mypy format run-hw2 up-hw3 down-hw3 demo-hw3
 
 sync:
 	uv sync --locked
@@ -14,15 +14,24 @@ test-hw2:
 lint: lint-ruff lint-mypy
 
 lint-ruff:
-	uv run ruff format --check hw2/hw/shop_api hw2/hw/tests
-	uv run ruff check hw2/hw/shop_api hw2/hw/tests
+	uv run ruff format --check hw2/hw/shop_api hw2/hw/tests hw3
+	uv run ruff check hw2/hw/shop_api hw2/hw/tests hw3
 
 lint-mypy:
-	uv run mypy hw2/hw/shop_api
+	uv run mypy hw2/hw/shop_api hw3
 
 format:
-	uv run ruff check --fix hw2/hw/shop_api hw2/hw/tests
-	uv run ruff format hw2/hw/shop_api hw2/hw/tests
+	uv run ruff check --fix hw2/hw/shop_api hw2/hw/tests hw3
+	uv run ruff format hw2/hw/shop_api hw2/hw/tests hw3
 
 run-hw2:
 	uv run uvicorn hw2.hw.shop_api.main:app --reload
+
+up-hw3:
+	docker compose up --build -d --wait
+
+down-hw3:
+	docker compose down
+
+demo-hw3:
+	uv run python hw3/generate_traffic.py

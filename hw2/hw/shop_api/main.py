@@ -5,12 +5,21 @@ from typing import Annotated
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Query, Response, WebSocket, WebSocketDisconnect
+from prometheus_fastapi_instrumentator import Instrumentator, metrics
 
 from .chat import ChatRooms
 from .models import Cart, CartCreated, Item, ItemData, ItemPatch
 from .store import ShopStore
 
 app = FastAPI(title="Shop API")
+Instrumentator(
+    should_group_status_codes=False,
+    excluded_handlers=["^/metrics$", "^/docs$", "^/redoc$", "^/openapi.json$"],
+).add(
+    metrics.default(
+        latency_highr_buckets=(0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5, 10),
+    )
+).instrument(app).expose(app, include_in_schema=False)
 store = ShopStore()
 chat_rooms = ChatRooms()
 

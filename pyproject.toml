@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.117.1",
+    "prometheus-fastapi-instrumentator>=7.1.0,<8",
     "uvicorn>=0.24.0",
     "websockets>=15.0.1",
 ]
