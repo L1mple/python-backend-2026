@@ -2,6 +2,7 @@
 fastapi>=0.117.1
 uvicorn>=0.24.0
 websockets>=13.0
+prometheus-fastapi-instrumentator
 
 # Зависимости для тестирования
 pytest>=7.4.0

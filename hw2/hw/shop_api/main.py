@@ -5,6 +5,7 @@ from fastapi import (
     HTTPException,
     Response,
 )
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import (
     NonNegativeFloat,
     NonNegativeInt,
@@ -22,6 +23,10 @@ from shop_api.storage import InMemoryShopStorage
 
 app = FastAPI(title="Shop API")
 app.include_router(chat_router)
+Instrumentator(
+    should_group_status_codes=False,
+    excluded_handlers=["/metrics", "/docs", "/openapi.json"],
+).instrument(app).expose(app)
 
 storage = InMemoryShopStorage()
 
