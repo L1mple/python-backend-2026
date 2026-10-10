@@ -3,7 +3,7 @@ import random
 
 import httpx
 
-client = httpx.Client(base_url="http://localhost:8080")
+client = httpx.Client(base_url="http://localhost:8000")
 
 item_ids = [
     client.post("/item", json={"name": f"item {i}", "price": random.uniform(10, 500)}).json()["id"]
