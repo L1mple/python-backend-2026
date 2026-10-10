@@ -3,12 +3,14 @@ from itertools import count
 from typing import Annotated
 
 from fastapi import FastAPI, HTTPException, Query, Response
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, ConfigDict, NonNegativeFloat, NonNegativeInt, PositiveInt
 
 from shop_api.chat import router as chat_router
 
 app = FastAPI(title="Shop API")
 app.include_router(chat_router)
+Instrumentator().instrument(app).expose(app)
 
 
 class Item(BaseModel):
