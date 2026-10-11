@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import PlainTextResponse
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from shop_api.exceptions import NotFoundError
 from shop_api.routers.items_router import router as item_router
@@ -7,6 +8,7 @@ from shop_api.routers.carts_router import router as cart_router
 from shop_api.routers.chat_router import router as chat_router
 
 app = FastAPI(title="Shop API")
+Instrumentator(excluded_handlers=["/metrics"]).instrument(app).expose(app)
 
 
 @app.exception_handler(NotFoundError)
