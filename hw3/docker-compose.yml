@@ -1,0 +1,5 @@
+services:
+  hw3:
+    build: .
+    ports:
+      - "8000:8000"
