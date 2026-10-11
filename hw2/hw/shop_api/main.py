@@ -1,12 +1,14 @@
 from typing import Annotated
 
 from fastapi import FastAPI, Query, Response, WebSocket, WebSocketDisconnect
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from .chat import Chat
 from .models import Cart, Item, ItemInput, ItemPatch
 from .store import Shop
 
 app = FastAPI(title="Shop API")
+Instrumentator(excluded_handlers=["/metrics"]).instrument(app).expose(app)
 shop = Shop()
 chat = Chat()
 
