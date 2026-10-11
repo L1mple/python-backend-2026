@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: Shop API
+    orgId: 1
+    folder: Shop API
+    type: file
+    disableDeletion: false
+    editable: false
+    options:
+      path: /var/lib/grafana/dashboards
