@@ -1,10 +1,13 @@
 from fastapi import FastAPI, HTTPException
 from collections import defaultdict
 from itertools import count
-from pydantic import BaseModel #TODO
+from pydantic import BaseModel 
 from pydantic import ConfigDict
 
+from prometheus_fastapi_instrumentator import Instrumentator
+
 app = FastAPI(title="Shop API")
+Instrumentator().instrument(app).expose(app)
 
 cart_id_counter = count(1)
 
