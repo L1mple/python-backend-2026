@@ -1,7 +1,9 @@
 from fastapi import FastAPI, HTTPException, Query, Response
 from pydantic import BaseModel
+from prometheus_fastapi_instrumentator import Instrumentator
 
 app = FastAPI(title="Shop API")
+Instrumentator().instrument(app).expose(app)
 items = {}
 carts = {}
 
