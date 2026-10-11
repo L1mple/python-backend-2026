@@ -3,6 +3,7 @@ from typing import Any
 from fastapi import FastAPI, Query, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from prometheus_fastapi_instrumentator import Instrumentator
 
 
 class ItemRequest(BaseModel):
@@ -27,6 +28,7 @@ class PatchItemRequest(BaseModel):
 
 
 app = FastAPI(title="Shop API")
+Instrumentator().instrument(app).expose(app)
 
 items: dict[int, dict[str, Any]] = {}
 carts: dict[int, dict[int, int]] = {}
