@@ -1,0 +1,58 @@
+name: hw2-shop
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: hw4_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "7432:5432"
+    volumes:
+      - shop_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  shop_api:
+    build:
+      context: ../..
+      dockerfile: hw2/hw/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:password@postgres:5432/hw4_db
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    volumes:
+      - ./settings/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - shop_api
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./settings/grafana/provisioning/:/etc/grafana/provisioning/:ro
+      - ./settings/grafana/dashboards/:/var/lib/grafana/dashboards/:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  shop_postgres_data:
