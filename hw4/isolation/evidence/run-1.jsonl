@@ -1,50 +1,50 @@
-{"seq":1,"case":"dirty_ru","isolation":"READ_UNCOMMITTED","tx":"T1","event":"BEGIN","value":null,"elapsed_ms":92.391875}
-{"seq":2,"case":"dirty_ru","isolation":"READ_UNCOMMITTED","tx":"T2","event":"BEGIN","value":null,"elapsed_ms":96.325125}
-{"seq":3,"case":"dirty_ru","isolation":"READ_UNCOMMITTED","tx":"T1","event":"READ_1","value":100,"elapsed_ms":102.519250}
-{"seq":4,"case":"dirty_ru","isolation":"READ_UNCOMMITTED","tx":"T2","event":"UPDATE","value":200,"elapsed_ms":107.263917}
-{"seq":5,"case":"dirty_ru","isolation":"READ_UNCOMMITTED","tx":"T1","event":"READ_2","value":200,"elapsed_ms":107.793667}
-{"seq":6,"case":"dirty_ru","isolation":"READ_UNCOMMITTED","tx":"T2","event":"ROLLBACK","value":null,"elapsed_ms":108.219750}
-{"seq":7,"case":"dirty_ru","isolation":"READ_UNCOMMITTED","tx":"T1","event":"READ_AFTER_ROLLBACK","value":100,"elapsed_ms":108.690750}
-{"seq":8,"case":"dirty_ru","isolation":"READ_UNCOMMITTED","tx":"T1","event":"COMMIT","value":null,"elapsed_ms":108.934250}
-{"seq":9,"case":"dirty_ru","isolation":"READ_UNCOMMITTED","tx":"LAB","event":"PASS","value":200,"elapsed_ms":109.146292}
-{"seq":10,"case":"dirty_rc","isolation":"READ_COMMITTED","tx":"T1","event":"BEGIN","value":null,"elapsed_ms":111.327958}
-{"seq":11,"case":"dirty_rc","isolation":"READ_COMMITTED","tx":"T2","event":"BEGIN","value":null,"elapsed_ms":111.520292}
-{"seq":12,"case":"dirty_rc","isolation":"READ_COMMITTED","tx":"T1","event":"READ_1","value":100,"elapsed_ms":111.758792}
-{"seq":13,"case":"dirty_rc","isolation":"READ_COMMITTED","tx":"T2","event":"UPDATE","value":200,"elapsed_ms":112.084917}
-{"seq":14,"case":"dirty_rc","isolation":"READ_COMMITTED","tx":"T1","event":"READ_2","value":100,"elapsed_ms":112.381833}
-{"seq":15,"case":"dirty_rc","isolation":"READ_COMMITTED","tx":"T2","event":"ROLLBACK","value":null,"elapsed_ms":112.656583}
-{"seq":16,"case":"dirty_rc","isolation":"READ_COMMITTED","tx":"T1","event":"READ_AFTER_ROLLBACK","value":100,"elapsed_ms":113.011792}
-{"seq":17,"case":"dirty_rc","isolation":"READ_COMMITTED","tx":"T1","event":"COMMIT","value":null,"elapsed_ms":113.208833}
-{"seq":18,"case":"dirty_rc","isolation":"READ_COMMITTED","tx":"LAB","event":"PASS","value":100,"elapsed_ms":113.358792}
-{"seq":19,"case":"nonrepeatable_rc","isolation":"READ_COMMITTED","tx":"T1","event":"BEGIN","value":null,"elapsed_ms":115.203875}
-{"seq":20,"case":"nonrepeatable_rc","isolation":"READ_COMMITTED","tx":"T2","event":"BEGIN","value":null,"elapsed_ms":115.356917}
-{"seq":21,"case":"nonrepeatable_rc","isolation":"READ_COMMITTED","tx":"T1","event":"READ_1","value":100,"elapsed_ms":115.599250}
-{"seq":22,"case":"nonrepeatable_rc","isolation":"READ_COMMITTED","tx":"T2","event":"UPDATE","value":200,"elapsed_ms":115.887583}
-{"seq":23,"case":"nonrepeatable_rc","isolation":"READ_COMMITTED","tx":"T2","event":"COMMIT","value":null,"elapsed_ms":116.062333}
-{"seq":24,"case":"nonrepeatable_rc","isolation":"READ_COMMITTED","tx":"T1","event":"READ_2","value":200,"elapsed_ms":116.342250}
-{"seq":25,"case":"nonrepeatable_rc","isolation":"READ_COMMITTED","tx":"T1","event":"COMMIT","value":null,"elapsed_ms":116.488042}
-{"seq":26,"case":"nonrepeatable_rc","isolation":"READ_COMMITTED","tx":"LAB","event":"PASS","value":200,"elapsed_ms":116.663833}
-{"seq":27,"case":"nonrepeatable_rr","isolation":"REPEATABLE_READ","tx":"T1","event":"BEGIN","value":null,"elapsed_ms":118.502417}
-{"seq":28,"case":"nonrepeatable_rr","isolation":"REPEATABLE_READ","tx":"T2","event":"BEGIN","value":null,"elapsed_ms":118.714708}
-{"seq":29,"case":"nonrepeatable_rr","isolation":"REPEATABLE_READ","tx":"T1","event":"READ_1","value":100,"elapsed_ms":119.014833}
-{"seq":30,"case":"nonrepeatable_rr","isolation":"REPEATABLE_READ","tx":"T2","event":"UPDATE","value":200,"elapsed_ms":119.307042}
-{"seq":31,"case":"nonrepeatable_rr","isolation":"REPEATABLE_READ","tx":"T2","event":"COMMIT","value":null,"elapsed_ms":119.485417}
-{"seq":32,"case":"nonrepeatable_rr","isolation":"REPEATABLE_READ","tx":"T1","event":"READ_2","value":100,"elapsed_ms":119.930083}
-{"seq":33,"case":"nonrepeatable_rr","isolation":"REPEATABLE_READ","tx":"T1","event":"COMMIT","value":null,"elapsed_ms":120.193083}
-{"seq":34,"case":"nonrepeatable_rr","isolation":"REPEATABLE_READ","tx":"LAB","event":"PASS","value":100,"elapsed_ms":120.570333}
-{"seq":35,"case":"phantom_rr","isolation":"REPEATABLE_READ","tx":"T1","event":"BEGIN","value":null,"elapsed_ms":122.945167}
-{"seq":36,"case":"phantom_rr","isolation":"REPEATABLE_READ","tx":"T2","event":"BEGIN","value":null,"elapsed_ms":123.154458}
-{"seq":37,"case":"phantom_rr","isolation":"REPEATABLE_READ","tx":"T1","event":"READ_1","value":1,"elapsed_ms":123.890833}
-{"seq":38,"case":"phantom_rr","isolation":"REPEATABLE_READ","tx":"T2","event":"INSERT","value":150,"elapsed_ms":124.172250}
-{"seq":39,"case":"phantom_rr","isolation":"REPEATABLE_READ","tx":"T2","event":"COMMIT","value":null,"elapsed_ms":124.391833}
-{"seq":40,"case":"phantom_rr","isolation":"REPEATABLE_READ","tx":"T1","event":"READ_2","value":1,"elapsed_ms":124.800000}
-{"seq":41,"case":"phantom_rr","isolation":"REPEATABLE_READ","tx":"T1","event":"COMMIT","value":null,"elapsed_ms":124.934792}
-{"seq":42,"case":"phantom_rr","isolation":"REPEATABLE_READ","tx":"LAB","event":"PASS","value":1,"elapsed_ms":125.094167}
-{"seq":43,"case":"phantom_serializable","isolation":"SERIALIZABLE","tx":"T1","event":"BEGIN","value":null,"elapsed_ms":127.014833}
-{"seq":44,"case":"phantom_serializable","isolation":"SERIALIZABLE","tx":"T2","event":"BEGIN","value":null,"elapsed_ms":127.313375}
-{"seq":45,"case":"phantom_serializable","isolation":"SERIALIZABLE","tx":"T1","event":"READ_1","value":1,"elapsed_ms":127.497417}
-{"seq":46,"case":"phantom_serializable","isolation":"SERIALIZABLE","tx":"T2","event":"INSERT","value":150,"elapsed_ms":127.777792}
-{"seq":47,"case":"phantom_serializable","isolation":"SERIALIZABLE","tx":"T2","event":"COMMIT","value":null,"elapsed_ms":127.934958}
-{"seq":48,"case":"phantom_serializable","isolation":"SERIALIZABLE","tx":"T1","event":"READ_2","value":1,"elapsed_ms":128.214000}
-{"seq":49,"case":"phantom_serializable","isolation":"SERIALIZABLE","tx":"T1","event":"COMMIT","value":null,"elapsed_ms":128.802333}
-{"seq":50,"case":"phantom_serializable","isolation":"SERIALIZABLE","tx":"LAB","event":"PASS","value":1,"elapsed_ms":129.022875}
+{"seq": 1, "case": "dirty_ru", "isolation": "READ_UNCOMMITTED", "tx": "T1", "event": "BEGIN", "value": null, "elapsed_ms": 182.911542}
+{"seq": 2, "case": "dirty_ru", "isolation": "READ_UNCOMMITTED", "tx": "T2", "event": "BEGIN", "value": null, "elapsed_ms": 183.113959}
+{"seq": 3, "case": "dirty_ru", "isolation": "READ_UNCOMMITTED", "tx": "T1", "event": "READ_1", "value": 100, "elapsed_ms": 191.691375}
+{"seq": 4, "case": "dirty_ru", "isolation": "READ_UNCOMMITTED", "tx": "T2", "event": "UPDATE", "value": 200, "elapsed_ms": 193.100042}
+{"seq": 5, "case": "dirty_ru", "isolation": "READ_UNCOMMITTED", "tx": "T1", "event": "READ_2", "value": 200, "elapsed_ms": 193.474542}
+{"seq": 6, "case": "dirty_ru", "isolation": "READ_UNCOMMITTED", "tx": "T2", "event": "ROLLBACK", "value": null, "elapsed_ms": 193.846459}
+{"seq": 7, "case": "dirty_ru", "isolation": "READ_UNCOMMITTED", "tx": "T1", "event": "READ_AFTER_ROLLBACK", "value": 100, "elapsed_ms": 194.16675}
+{"seq": 8, "case": "dirty_ru", "isolation": "READ_UNCOMMITTED", "tx": "T1", "event": "COMMIT", "value": null, "elapsed_ms": 194.259625}
+{"seq": 9, "case": "dirty_ru", "isolation": "READ_UNCOMMITTED", "tx": "LAB", "event": "PASS", "value": 200, "elapsed_ms": 194.478709}
+{"seq": 10, "case": "dirty_rc", "isolation": "READ_COMMITTED", "tx": "T1", "event": "BEGIN", "value": null, "elapsed_ms": 196.462875}
+{"seq": 11, "case": "dirty_rc", "isolation": "READ_COMMITTED", "tx": "T2", "event": "BEGIN", "value": null, "elapsed_ms": 196.645542}
+{"seq": 12, "case": "dirty_rc", "isolation": "READ_COMMITTED", "tx": "T1", "event": "READ_1", "value": 100, "elapsed_ms": 196.891417}
+{"seq": 13, "case": "dirty_rc", "isolation": "READ_COMMITTED", "tx": "T2", "event": "UPDATE", "value": 200, "elapsed_ms": 197.196667}
+{"seq": 14, "case": "dirty_rc", "isolation": "READ_COMMITTED", "tx": "T1", "event": "READ_2", "value": 100, "elapsed_ms": 197.468959}
+{"seq": 15, "case": "dirty_rc", "isolation": "READ_COMMITTED", "tx": "T2", "event": "ROLLBACK", "value": null, "elapsed_ms": 197.62425}
+{"seq": 16, "case": "dirty_rc", "isolation": "READ_COMMITTED", "tx": "T1", "event": "READ_AFTER_ROLLBACK", "value": 100, "elapsed_ms": 197.862625}
+{"seq": 17, "case": "dirty_rc", "isolation": "READ_COMMITTED", "tx": "T1", "event": "COMMIT", "value": null, "elapsed_ms": 197.958292}
+{"seq": 18, "case": "dirty_rc", "isolation": "READ_COMMITTED", "tx": "LAB", "event": "PASS", "value": 100, "elapsed_ms": 198.113625}
+{"seq": 19, "case": "nonrepeatable_rc", "isolation": "READ_COMMITTED", "tx": "T1", "event": "BEGIN", "value": null, "elapsed_ms": 202.385459}
+{"seq": 20, "case": "nonrepeatable_rc", "isolation": "READ_COMMITTED", "tx": "T2", "event": "BEGIN", "value": null, "elapsed_ms": 204.303834}
+{"seq": 21, "case": "nonrepeatable_rc", "isolation": "READ_COMMITTED", "tx": "T1", "event": "READ_1", "value": 100, "elapsed_ms": 204.586792}
+{"seq": 22, "case": "nonrepeatable_rc", "isolation": "READ_COMMITTED", "tx": "T2", "event": "UPDATE", "value": 200, "elapsed_ms": 204.91725}
+{"seq": 23, "case": "nonrepeatable_rc", "isolation": "READ_COMMITTED", "tx": "T2", "event": "COMMIT", "value": null, "elapsed_ms": 205.10375}
+{"seq": 24, "case": "nonrepeatable_rc", "isolation": "READ_COMMITTED", "tx": "T1", "event": "READ_2", "value": 200, "elapsed_ms": 205.384875}
+{"seq": 25, "case": "nonrepeatable_rc", "isolation": "READ_COMMITTED", "tx": "T1", "event": "COMMIT", "value": null, "elapsed_ms": 205.484917}
+{"seq": 26, "case": "nonrepeatable_rc", "isolation": "READ_COMMITTED", "tx": "LAB", "event": "PASS", "value": 200, "elapsed_ms": 205.680917}
+{"seq": 27, "case": "nonrepeatable_rr", "isolation": "REPEATABLE_READ", "tx": "T1", "event": "BEGIN", "value": null, "elapsed_ms": 207.4135}
+{"seq": 28, "case": "nonrepeatable_rr", "isolation": "REPEATABLE_READ", "tx": "T2", "event": "BEGIN", "value": null, "elapsed_ms": 207.592042}
+{"seq": 29, "case": "nonrepeatable_rr", "isolation": "REPEATABLE_READ", "tx": "T1", "event": "READ_1", "value": 100, "elapsed_ms": 207.98825}
+{"seq": 30, "case": "nonrepeatable_rr", "isolation": "REPEATABLE_READ", "tx": "T2", "event": "UPDATE", "value": 200, "elapsed_ms": 208.2835}
+{"seq": 31, "case": "nonrepeatable_rr", "isolation": "REPEATABLE_READ", "tx": "T2", "event": "COMMIT", "value": null, "elapsed_ms": 208.440459}
+{"seq": 32, "case": "nonrepeatable_rr", "isolation": "REPEATABLE_READ", "tx": "T1", "event": "READ_2", "value": 100, "elapsed_ms": 208.66075}
+{"seq": 33, "case": "nonrepeatable_rr", "isolation": "REPEATABLE_READ", "tx": "T1", "event": "COMMIT", "value": null, "elapsed_ms": 208.740042}
+{"seq": 34, "case": "nonrepeatable_rr", "isolation": "REPEATABLE_READ", "tx": "LAB", "event": "PASS", "value": 100, "elapsed_ms": 208.871875}
+{"seq": 35, "case": "phantom_rr", "isolation": "REPEATABLE_READ", "tx": "T1", "event": "BEGIN", "value": null, "elapsed_ms": 210.425542}
+{"seq": 36, "case": "phantom_rr", "isolation": "REPEATABLE_READ", "tx": "T2", "event": "BEGIN", "value": null, "elapsed_ms": 210.5795}
+{"seq": 37, "case": "phantom_rr", "isolation": "REPEATABLE_READ", "tx": "T1", "event": "READ_1", "value": 1, "elapsed_ms": 211.05675}
+{"seq": 38, "case": "phantom_rr", "isolation": "REPEATABLE_READ", "tx": "T2", "event": "INSERT", "value": 150, "elapsed_ms": 211.277042}
+{"seq": 39, "case": "phantom_rr", "isolation": "REPEATABLE_READ", "tx": "T2", "event": "COMMIT", "value": null, "elapsed_ms": 211.405042}
+{"seq": 40, "case": "phantom_rr", "isolation": "REPEATABLE_READ", "tx": "T1", "event": "READ_2", "value": 1, "elapsed_ms": 211.64}
+{"seq": 41, "case": "phantom_rr", "isolation": "REPEATABLE_READ", "tx": "T1", "event": "COMMIT", "value": null, "elapsed_ms": 211.713417}
+{"seq": 42, "case": "phantom_rr", "isolation": "REPEATABLE_READ", "tx": "LAB", "event": "PASS", "value": 1, "elapsed_ms": 211.825125}
+{"seq": 43, "case": "phantom_serializable", "isolation": "SERIALIZABLE", "tx": "T1", "event": "BEGIN", "value": null, "elapsed_ms": 213.475209}
+{"seq": 44, "case": "phantom_serializable", "isolation": "SERIALIZABLE", "tx": "T2", "event": "BEGIN", "value": null, "elapsed_ms": 213.637042}
+{"seq": 45, "case": "phantom_serializable", "isolation": "SERIALIZABLE", "tx": "T1", "event": "READ_1", "value": 1, "elapsed_ms": 213.844542}
+{"seq": 46, "case": "phantom_serializable", "isolation": "SERIALIZABLE", "tx": "T2", "event": "INSERT", "value": 150, "elapsed_ms": 214.087334}
+{"seq": 47, "case": "phantom_serializable", "isolation": "SERIALIZABLE", "tx": "T2", "event": "COMMIT", "value": null, "elapsed_ms": 214.266375}
+{"seq": 48, "case": "phantom_serializable", "isolation": "SERIALIZABLE", "tx": "T1", "event": "READ_2", "value": 1, "elapsed_ms": 214.631667}
+{"seq": 49, "case": "phantom_serializable", "isolation": "SERIALIZABLE", "tx": "T1", "event": "COMMIT", "value": null, "elapsed_ms": 214.733792}
+{"seq": 50, "case": "phantom_serializable", "isolation": "SERIALIZABLE", "tx": "LAB", "event": "PASS", "value": 1, "elapsed_ms": 214.885375}

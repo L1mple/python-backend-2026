@@ -19,8 +19,10 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Build Java 21 / H2 2.5.252 runner
-        run: docker build -t h2-isolation hw4/isolation
+      - name: Build Python / JDBC / H2 2.5.252 runner
+        run: docker build --build-arg PYTHON_VERSION='${{ matrix.python-version }}' -t h2-isolation hw4/isolation
+      - name: Check worker failure and rollback
+        run: docker run --rm --entrypoint python h2-isolation -m unittest -v test_runner
       - name: Run six assertions three times
         run: |
           mkdir -p "$RUNNER_TEMP/h2-results"

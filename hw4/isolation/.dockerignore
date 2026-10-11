@@ -1,3 +1,5 @@
 *
-!IsolationLab.java
 !Dockerfile
+!runner.py
+!test_runner.py
+!runner-requirements.txt
