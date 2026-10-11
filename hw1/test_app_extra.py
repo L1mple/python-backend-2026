@@ -95,3 +95,11 @@ def test_disconnected_body_does_not_send_response():
 
     asyncio.run(application({'type': 'http', 'method': 'GET', 'path': '/mean', 'query_string': b''}, receive, send))
     assert sent == []
+
+
+@pytest.mark.asyncio
+async def test_mean_large_integer_cancellation():
+    async with TestClient(application) as client:
+        response = await client.get('/mean', json=[10**400, -(10**400)])
+    assert response.status_code == 200
+    assert response.json() == {'result': 0}

@@ -56,7 +56,8 @@ class MathApplication:
                     raise ValueError
                 numbers = [float(value) for value in values[0].split(',')]
             if not isinstance(numbers, list) or any(
-                type(value) not in (int, float) or not math.isfinite(value)
+                type(value) not in (int, float)
+                or (type(value) is float and not math.isfinite(value))
                 for value in numbers
             ):
                 raise ValueError
