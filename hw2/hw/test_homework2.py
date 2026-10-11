@@ -282,3 +282,16 @@ def test_delete_item(existing_item: dict[str, Any]) -> None:
 
     response = client.delete(f"/item/{item_id}")
     assert response.status_code == HTTPStatus.OK
+
+
+def test_chat_broadcasts_only_inside_room() -> None:
+    with (
+        client.websocket_connect("/chat/room") as first,
+        client.websocket_connect("/chat/room") as second,
+    ):
+        first.send_text("Привет,я 1")
+        message = second.receive_text()
+        assert message.endswith(" :: Привет,я 1")
+        second.send_text("Привет,я 2")
+        message = first.receive_text()
+        assert message.endswith(" :: Привет,я 2")
