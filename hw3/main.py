@@ -1,9 +1,12 @@
 from fastapi import FastAPI,  Query, HTTPException
+from prometheus_fastapi_instrumentator import Instrumentator
 from fastapi.responses import JSONResponse
 from http import HTTPStatus
 from pydantic import BaseModel, ConfigDict
 
 app = FastAPI(title="Shop API")
+Instrumentator().instrument(app).expose(app)
+
 class ItemToModify(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
