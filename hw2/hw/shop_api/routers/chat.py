@@ -3,6 +3,8 @@ from uuid import uuid4
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from shop_api import metrics
+
 router = APIRouter(tags=["chat"])
 
 # Название чата -> подключённые к нему клиенты
@@ -15,6 +17,7 @@ async def chat(ws: WebSocket, chat_name: str) -> None:
     username = f"user-{uuid4().hex[:8]}"
     room = _rooms[chat_name]
     room.append(ws)
+    metrics.CHAT_CONNECTIONS.inc()
 
     try:
         while True:
@@ -24,6 +27,7 @@ async def chat(ws: WebSocket, chat_name: str) -> None:
                 if other is not ws:
                     await other.send_text(f"{username} :: {message}")
     except WebSocketDisconnect:
+        metrics.CHAT_CONNECTIONS.dec()
         room.remove(ws)
         if not room:
             del _rooms[chat_name]

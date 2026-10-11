@@ -3,7 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, Response
 
-from shop_api import storage
+from shop_api import metrics, storage
 from shop_api.contracts import CartCreatedResponse, CartItemResponse, CartResponse
 from shop_api.storage import Cart
 
@@ -42,6 +42,7 @@ def _get_cart_or_404(cart_id: int) -> Cart:
 @router.post("", status_code=HTTPStatus.CREATED)
 async def create_cart(response: Response) -> CartCreatedResponse:
     cart = storage.add_cart()
+    metrics.CARTS_CREATED.inc()
     response.headers["location"] = f"/cart/{cart.id}"
     return CartCreatedResponse(id=cart.id)
 
@@ -89,4 +90,5 @@ async def add_item_to_cart(cart_id: int, item_id: int) -> CartResponse:
         raise HTTPException(HTTPStatus.NOT_FOUND, f"Item {item_id} not found")
 
     storage.add_to_cart(cart, item)
+    metrics.CART_ITEMS_ADDED.inc()
     return _cart_response(cart)

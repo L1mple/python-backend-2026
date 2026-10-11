@@ -3,7 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, Response
 
-from shop_api import storage
+from shop_api import metrics, storage
 from shop_api.contracts import ItemPatchRequest, ItemRequest, ItemResponse
 from shop_api.storage import Item
 
@@ -27,6 +27,7 @@ def _get_editable_item(item_id: int) -> Item:
 @router.post("", status_code=HTTPStatus.CREATED)
 async def create_item(body: ItemRequest, response: Response) -> ItemResponse:
     item = storage.add_item(body.name, body.price)
+    metrics.ITEMS_CREATED.inc()
     response.headers["location"] = f"/item/{item.id}"
     return ItemResponse.from_item(item)
 
@@ -79,5 +80,7 @@ async def update_item(item_id: int, body: ItemPatchRequest) -> ItemResponse:
 async def delete_item(item_id: int) -> ItemResponse:
     # Повторное удаление тоже отвечает 200: результат тот же
     item = _get_item_or_404(item_id)
+    if not item.deleted:
+        metrics.ITEMS_DELETED.inc()
     item.deleted = True
     return ItemResponse.from_item(item)
