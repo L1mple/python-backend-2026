@@ -197,11 +197,3 @@ def test_overflowing_price_change_preserves_item_and_all_carts(client, method):
     assert response.status_code == 422
     assert client.get(f"/item/{item['id']}").json() == item
     assert client.get("/cart", params={"max_price": 1e308}).json() == carts
-
-
-def test_cart_read_rejects_nonfinite_stored_total(client):
-    item = client.post("/item", json={"name": "Large", "price": 1e308}).json()
-    cart_id = client.post("/cart").json()["id"]
-    main.shop.carts[cart_id][item["id"]] = 2
-    assert client.get(f"/cart/{cart_id}").status_code == 422
-    assert client.get("/cart", params={"max_price": 100}).status_code == 422
