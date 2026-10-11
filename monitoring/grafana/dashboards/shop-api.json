@@ -428,7 +428,7 @@
     {
       "id": 8,
       "title": "Critical operation latency p95",
-      "description": "Measured operations including failures: cart retrieval/calculation, mutations, catalog/cart filtering and writes.",
+      "description": "Measured operations including failures: cart retrieval/calculation, mutations, catalog/cart filtering and writes. Stages without observations in this window are omitted.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -443,7 +443,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by (le, stage) (rate(shop_stage_duration_seconds_bucket{job=\"shop\",datacenter=~\"$datacenter\",instance=~\"$instance\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le, stage) (rate(shop_stage_duration_seconds_bucket{job=\"shop\",datacenter=~\"$datacenter\",instance=~\"$instance\"}[$__rate_interval]))) and on (stage) (sum by (stage) (rate(shop_stage_duration_seconds_count{job=\"shop\",datacenter=~\"$datacenter\",instance=~\"$instance\"}[$__rate_interval])) > 0)",
           "legendFormat": "{{stage}}"
         }
       ],

@@ -155,3 +155,26 @@ def test_load_observes_unavailable_items_and_failed_additions(monkeypatch):
     assert after.get(key, 0) - before.get(key, 0) == 1
     key = ("shop_cart_unavailable_quantity_sum", ())
     assert after.get(key, 0) - before.get(key, 0) == 1
+
+
+def test_load_exercises_cart_filtering(monkeypatch):
+    spec = importlib.util.spec_from_file_location(
+        "load_shop", Path(__file__).resolve().parents[2] / "scripts/load_shop.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    clock = iter((0, 0, 2))
+    monkeypatch.setattr(
+        module,
+        "time",
+        SimpleNamespace(monotonic=lambda: next(clock), sleep=lambda _: None),
+    )
+    with TestClient(app) as client:
+        before = metric_values(client)
+        assert module.ShopLoad(client).run(1, 0.1) == 1
+        after = metric_values(client)
+    key = (
+        "shop_stage_duration_seconds_count",
+        (("result", "success"), ("stage", "cart_filter")),
+    )
+    assert after.get(key, 0) - before.get(key, 0) == 1

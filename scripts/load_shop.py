@@ -24,6 +24,7 @@ class ShopLoad:
         while time.monotonic() < deadline:
             for response in (
                 self.client.get("/item"),
+                self.client.get("/cart", params={"limit": 10}),
                 self.client.get(f"/item/{item_id}"),
                 self.client.post(f"/cart/{cart_id}/add/{item_id}"),
                 self.client.get(f"/cart/{cart_id}"),
