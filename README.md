@@ -51,7 +51,8 @@ CPU и RAM экспортирует стандартный Linux process collect
 минимальный интервал — 0.01 секунды; сетевой timeout — 5 секунд.
 Один цикл содержит шесть запросов. Таймер проверяется между циклами, поэтому
 последний цикл может закончиться после указанного срока. Это демонстрация метрик,
-а не бенчмарк производительности. Магазин хранит данные в памяти: перезапуск их удаляет.
+а не бенчмарк производительности. Магазин хранит данные в PostgreSQL:
+перезапуски приложения и БД сохраняют товары и корзины.
 
 Проверки на обеих версиях Python:
 
@@ -71,3 +72,41 @@ PYTHONPATH=hw2/hw uv run --no-project --python 3.14 --with-requirements hw2/hw/r
 ```bash
 docker compose -p python-backend-hw3 down
 ```
+
+## ДЗ4: PostgreSQL и транзакции
+
+Тот же Compose-проект запускает PostgreSQL 17 с healthcheck и volume
+`postgres-data`. Команда запуска выше обновляет магазин и сохраняет volumes
+Prometheus и Grafana. PostgreSQL доступен на `127.0.0.1:15432`, база и пользователь
+`shop`, локальный пароль `local-homework`. Не используйте `down -v`, если нужны данные.
+
+Хранилище использует SQLAlchemy 2 и отдельную транзакцию для каждой записи.
+Таблицы товаров, корзин и позиций имеют внешние ключи, уникальную пару
+`(cart_id, item_id)`, положительное количество и конечную неотрицательную цену.
+Добавление товара выполняет атомарный `INSERT ... ON CONFLICT DO UPDATE`, поэтому
+параллельные запросы не теряют увеличения количества. Ошибка после записи
+откатывает транзакцию. Удаление остаётся мягким: позиции сохраняются, а удалённый
+товар исключается из стоимости корзины. REST, WebSocket и метрики работают как раньше.
+
+Для запуска магазина вне Compose используется `DATABASE_URL`; по умолчанию он
+подключается к локальному PostgreSQL из этого Compose-проекта:
+
+```bash
+PYTHONPATH=hw2/hw uv run --no-project --python 3.13 --with-requirements hw2/hw/requirements.txt uvicorn shop_api.main:app
+```
+
+Обычные команды pytest выше автоматически используют временную SQLite,
+если `DATABASE_URL` не задан. Явный URL сохраняется: тесты создают данные,
+поэтому для PostgreSQL укажите отдельную тестовую БД, а не базу магазина.
+Например, один раз создайте `shop_tests` и запускайте проверки на обеих версиях:
+
+```bash
+docker compose -p python-backend-hw3 exec -T postgres createdb -U shop shop_tests
+DATABASE_URL=postgresql+psycopg://shop:local-homework@127.0.0.1:15432/shop_tests PYTHONPATH=hw2/hw uv run --no-project --python 3.13 --with-requirements hw2/hw/requirements.txt pytest -q hw2/hw
+DATABASE_URL=postgresql+psycopg://shop:local-homework@127.0.0.1:15432/shop_tests PYTHONPATH=hw2/hw uv run --no-project --python 3.14 --with-requirements hw2/hw/requirements.txt pytest -q hw2/hw
+```
+
+Исходные HTTP-тесты работают и на PostgreSQL. Дополнительные проверки используют
+собственные временные схемы: ограничения БД, rollback после upsert, повторное
+подключение и 48 параллельных HTTP-добавлений. На SQLite последняя проверка
+пропускается; workflow `HW4 PostgreSQL` запускает её на PostgreSQL 17.

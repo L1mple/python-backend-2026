@@ -6,8 +6,8 @@ from shop_api import main
 
 
 @pytest.fixture
-def client(monkeypatch):
-    monkeypatch.setattr(main, "shop", main.Shop())
+def client(monkeypatch, isolated_shop):
+    monkeypatch.setattr(main, "shop", isolated_shop)
     monkeypatch.setattr(main, "chat", main.Chat())
     with TestClient(main.app) as client:
         yield client

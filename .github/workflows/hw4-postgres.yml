@@ -1,0 +1,35 @@
+name: HW4 PostgreSQL
+on:
+  push:
+    branches: [hw4]
+  pull_request:
+    branches: [main, hw2, hw3]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.13', '3.14']
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: shop
+          POSTGRES_PASSWORD: local-homework
+          POSTGRES_DB: shop_tests
+        ports: ['15432:5432']
+        options: >-
+          --health-cmd "pg_isready -U shop -d shop_tests"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Test PostgreSQL storage and original HTTP contract
+        env:
+          PYTHONPATH: hw2/hw
+          DATABASE_URL: postgresql+psycopg://shop:local-homework@127.0.0.1:15432/shop_tests
+        run: uv run --no-project --python ${{ matrix.python-version }} --with-requirements hw2/hw/requirements.txt pytest -q hw2/hw

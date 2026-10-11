@@ -1,9 +1,28 @@
 services:
   shop:
     build: .
+    environment:
+      DATABASE_URL: postgresql+psycopg://shop:local-homework@postgres:5432/shop
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports: ["127.0.0.1:8000:8000"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/metrics')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: shop
+      POSTGRES_PASSWORD: local-homework
+      POSTGRES_DB: shop
+    ports: ["127.0.0.1:15432:5432"]
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shop -d shop"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -31,3 +50,4 @@ services:
 volumes:
   prometheus-data:
   grafana-data:
+  postgres-data:

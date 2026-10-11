@@ -19,19 +19,19 @@ Quantity = Annotated[int | None, Query(ge=0)]
 
 
 @app.post("/cart", status_code=201)
-async def create_cart(response: Response):
+def create_cart(response: Response):
     cart_id = shop.create_cart()
     response.headers["Location"] = f"/cart/{cart_id}"
     return {"id": cart_id}
 
 
 @app.get("/cart/{cart_id}", response_model=Cart)
-async def get_cart(cart_id: int):
+def get_cart(cart_id: int):
     return shop.get_cart(cart_id)
 
 
 @app.get("/cart", response_model=list[Cart])
-async def list_carts(
+def list_carts(
     offset: Offset = 0,
     limit: Limit = 10,
     min_price: Price = None,
@@ -39,64 +39,51 @@ async def list_carts(
     min_quantity: Quantity = None,
     max_quantity: Quantity = None,
 ):
-    carts = []
-    for cart_id in shop.carts:
-        cart = shop.get_cart(cart_id)
-        quantity = sum(item.quantity for item in cart.items)
-        if min_price is not None and cart.price < min_price:
-            continue
-        if max_price is not None and cart.price > max_price:
-            continue
-        if min_quantity is not None and quantity < min_quantity:
-            continue
-        if max_quantity is not None and quantity > max_quantity:
-            continue
-        carts.append(cart)
-    return carts[offset : offset + limit]
+    return shop.list_carts(
+        offset,
+        limit,
+        min_price,
+        max_price,
+        min_quantity,
+        max_quantity,
+    )
 
 
 @app.post("/cart/{cart_id}/add/{item_id}", response_model=Cart)
-async def add_item(cart_id: int, item_id: int):
+def add_item(cart_id: int, item_id: int):
     return shop.add_item(cart_id, item_id)
 
 
 @app.post("/item", status_code=201, response_model=Item)
-async def create_item(data: ItemInput, response: Response):
+def create_item(data: ItemInput, response: Response):
     item = shop.create_item(data)
     response.headers["Location"] = f"/item/{item.id}"
     return item
 
 
 @app.get("/item/{item_id}", response_model=Item)
-async def get_item(item_id: int):
+def get_item(item_id: int):
     return shop.get_item(item_id)
 
 
 @app.get("/item", response_model=list[Item])
-async def list_items(
+def list_items(
     offset: Offset = 0,
     limit: Limit = 10,
     min_price: Price = None,
     max_price: Price = None,
     show_deleted: bool = False,
 ):
-    items = [
-        item
-        for item in shop.items.values()
-        if (show_deleted or not item.deleted)
-        and (min_price is None or item.price >= min_price)
-        and (max_price is None or item.price <= max_price)
-    ]
-    return items[offset : offset + limit]
+    return shop.list_items(offset, limit, min_price, max_price, show_deleted)
 
 
 @app.put("/item/{item_id}", response_model=Item)
-async def replace_item(item_id: int, data: ItemInput):
+def replace_item(item_id: int, data: ItemInput):
     return shop.replace_item(item_id, data)
 
 
 @app.patch("/item/{item_id}", response_model=Item)
-async def patch_item(item_id: int, data: ItemPatch):
+def patch_item(item_id: int, data: ItemPatch):
     item = shop.patch_item(item_id, data)
     if item is None:
         return Response(status_code=304)
@@ -104,7 +91,7 @@ async def patch_item(item_id: int, data: ItemPatch):
 
 
 @app.delete("/item/{item_id}")
-async def delete_item(item_id: int):
+def delete_item(item_id: int):
     shop.delete_item(item_id)
     return Response(status_code=200)
 
