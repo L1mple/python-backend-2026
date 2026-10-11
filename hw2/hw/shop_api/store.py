@@ -1,4 +1,5 @@
 import os
+from math import isfinite
 
 from fastapi import HTTPException
 from sqlalchemy import case, create_engine, event, func, select
@@ -36,8 +37,13 @@ class Shop:
         return Item(id=row.id, name=row.name, price=row.price, deleted=row.deleted)
 
     @staticmethod
-    def _get_item(session: Session, item_id: int, include_deleted=False) -> ItemRow:
-        row = session.get(ItemRow, item_id)
+    def _get_item(
+        session: Session, item_id: int, include_deleted=False, for_update=False
+    ) -> ItemRow:
+        query = select(ItemRow).where(ItemRow.id == item_id)
+        if for_update:
+            query = query.with_for_update()
+        row = session.scalar(query)
         if row is None or (row.deleted and not include_deleted):
             raise HTTPException(404, "Item not found")
         return row
@@ -69,20 +75,26 @@ class Shop:
 
     def replace_item(self, item_id: int, data: ItemInput) -> Item:
         with self.sessions.begin() as session:
-            row = self._get_item(session, item_id, include_deleted=True)
+            row = self._get_item(
+                session, item_id, include_deleted=True, for_update=True
+            )
             for field, value in data.model_dump().items():
                 setattr(row, field, value)
             session.flush()
+            self._validate_item_carts(session, item_id)
             return self._item(row)
 
     def patch_item(self, item_id: int, data: ItemPatch) -> Item | None:
         with self.sessions.begin() as session:
-            row = self._get_item(session, item_id, include_deleted=True)
+            row = self._get_item(
+                session, item_id, include_deleted=True, for_update=True
+            )
             if row.deleted:
                 return None
             for field, value in data.model_dump(exclude_unset=True).items():
                 setattr(row, field, value)
             session.flush()
+            self._validate_item_carts(session, item_id)
             return self._item(row)
 
     def delete_item(self, item_id: int):
@@ -117,7 +129,21 @@ class Shop:
             )
             if not item.deleted:
                 cart.price += item.price * position.quantity
+                if not isfinite(cart.price):
+                    raise HTTPException(422, "Cart price must be finite")
         return list(carts.values())
+
+    def _validate_item_carts(self, session: Session, item_id: int):
+        affected = select(CartPosition.cart_id).where(CartPosition.item_id == item_id)
+        cart_ids = list(
+            session.scalars(
+                select(CartRow.id)
+                .where(CartRow.id.in_(affected))
+                .order_by(CartRow.id)
+                .with_for_update()
+            )
+        )
+        self._carts(session, cart_ids)
 
     def get_cart(self, cart_id: int) -> Cart:
         with self.sessions() as session:
@@ -173,6 +199,9 @@ class Shop:
             )
             if item is None or item.deleted:
                 raise HTTPException(404, "Item not found")
+            session.execute(
+                select(CartRow.id).where(CartRow.id == cart_id).with_for_update()
+            )
             insert = (
                 pg_insert if self.engine.dialect.name == "postgresql" else sqlite_insert
             )
