@@ -165,3 +165,43 @@ async def test_failed_recipient_does_not_interrupt_room_broadcast():
     assert sender.messages == []
     assert healthy.messages[0].endswith(" :: hello")
     assert broken not in chat.rooms["room"]
+
+
+@pytest.mark.parametrize("same_item", [True, False])
+def test_overflowing_add_preserves_cart(client, same_item):
+    first = client.post("/item", json={"name": "Large", "price": 1e308}).json()
+    second = (
+        first
+        if same_item
+        else client.post("/item", json={"name": "Other", "price": 1e308}).json()
+    )
+    cart_id = client.post("/cart").json()["id"]
+    client.post(f"/cart/{cart_id}/add/{first['id']}")
+    before = client.get(f"/cart/{cart_id}").json()
+    assert client.post(f"/cart/{cart_id}/add/{second['id']}").status_code == 422
+    assert client.get(f"/cart/{cart_id}").json() == before
+    assert client.get("/cart", params={"max_price": 1e308}).json() == [before]
+
+
+@pytest.mark.parametrize("method", ["put", "patch"])
+def test_overflowing_price_change_preserves_item_and_all_carts(client, method):
+    item = client.post("/item", json={"name": "Original", "price": 1e307}).json()
+    cart_ids = [client.post("/cart").json()["id"] for _ in range(2)]
+    for quantity, cart_id in enumerate(cart_ids, 1):
+        for _ in range(quantity):
+            client.post(f"/cart/{cart_id}/add/{item['id']}")
+    carts = client.get("/cart").json()
+    response = getattr(client, method)(
+        f"/item/{item['id']}", json={"name": "Changed", "price": 1e308}
+    )
+    assert response.status_code == 422
+    assert client.get(f"/item/{item['id']}").json() == item
+    assert client.get("/cart", params={"max_price": 1e308}).json() == carts
+
+
+def test_cart_read_rejects_nonfinite_stored_total(client):
+    item = client.post("/item", json={"name": "Large", "price": 1e308}).json()
+    cart_id = client.post("/cart").json()["id"]
+    main.shop.carts[cart_id][item["id"]] = 2
+    assert client.get(f"/cart/{cart_id}").status_code == 422
+    assert client.get("/cart", params={"max_price": 100}).status_code == 422
