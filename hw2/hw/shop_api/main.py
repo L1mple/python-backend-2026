@@ -1,9 +1,11 @@
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query, Response
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
 
 app = FastAPI(title="Shop API")
+Instrumentator().instrument(app).expose(app)
 
 items_db = {}
 carts_db = {}
