@@ -187,7 +187,7 @@ class Timeline:
             axis.grid(axis="x", alpha=0.2)
             axis.margins(x=0.12)
         figure.suptitle(
-            "H2 2.5.252 / two real transactions / latch-controlled ordering",
+            "H2 2.5.252 / Python + JDBC / two transactions",
             fontsize=15,
         )
         destination.parent.mkdir(parents=True, exist_ok=True)
