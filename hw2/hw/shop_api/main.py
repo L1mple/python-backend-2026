@@ -5,10 +5,33 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from .chat import Chat
 from .models import Cart, Item, ItemInput, ItemPatch
+from .metrics import metrics
 from .store import Shop
 
 app = FastAPI(title="Shop API")
-Instrumentator(excluded_handlers=["/metrics"]).instrument(app).expose(app)
+Instrumentator(excluded_handlers=["/metrics"]).instrument(
+    app,
+    latency_highr_buckets=(
+        0.0001,
+        0.00025,
+        0.0005,
+        0.001,
+        0.0025,
+        0.005,
+        0.01,
+        0.025,
+        0.05,
+        0.1,
+        0.25,
+        0.5,
+        1,
+        2.5,
+        5,
+        10,
+        30,
+        60,
+    ),
+).expose(app)
 shop = Shop()
 chat = Chat()
 
@@ -20,14 +43,19 @@ Quantity = Annotated[int | None, Query(ge=0)]
 
 @app.post("/cart", status_code=201)
 def create_cart(response: Response):
-    cart_id = shop.create_cart()
+    with metrics.stage("cart_creation"):
+        cart_id = shop.create_cart()
+    metrics.created.labels(resource="cart").inc()
     response.headers["Location"] = f"/cart/{cart_id}"
     return {"id": cart_id}
 
 
 @app.get("/cart/{cart_id}", response_model=Cart)
 def get_cart(cart_id: int):
-    return shop.get_cart(cart_id)
+    with metrics.stage("cart_lookup"):
+        cart = shop.get_cart(cart_id)
+    metrics.observe_cart(cart)
+    return cart
 
 
 @app.get("/cart", response_model=list[Cart])
@@ -39,24 +67,25 @@ def list_carts(
     min_quantity: Quantity = None,
     max_quantity: Quantity = None,
 ):
-    return shop.list_carts(
-        offset,
-        limit,
-        min_price,
-        max_price,
-        min_quantity,
-        max_quantity,
-    )
+    with metrics.stage("cart_filter"):
+        return shop.list_carts(
+            offset, limit, min_price, max_price, min_quantity, max_quantity
+        )
 
 
 @app.post("/cart/{cart_id}/add/{item_id}", response_model=Cart)
 def add_item(cart_id: int, item_id: int):
-    return shop.add_item(cart_id, item_id)
+    with metrics.stage("cart_mutation"):
+        cart = shop.add_item(cart_id, item_id)
+    metrics.observe_cart(cart)
+    return cart
 
 
 @app.post("/item", status_code=201, response_model=Item)
 def create_item(data: ItemInput, response: Response):
-    item = shop.create_item(data)
+    with metrics.stage("item_creation"):
+        item = shop.create_item(data)
+    metrics.created.labels(resource="item").inc()
     response.headers["Location"] = f"/item/{item.id}"
     return item
 
@@ -74,17 +103,20 @@ def list_items(
     max_price: Price = None,
     show_deleted: bool = False,
 ):
-    return shop.list_items(offset, limit, min_price, max_price, show_deleted)
+    with metrics.stage("catalog_filter"):
+        return shop.list_items(offset, limit, min_price, max_price, show_deleted)
 
 
 @app.put("/item/{item_id}", response_model=Item)
 def replace_item(item_id: int, data: ItemInput):
-    return shop.replace_item(item_id, data)
+    with metrics.stage("item_update"):
+        return shop.replace_item(item_id, data)
 
 
 @app.patch("/item/{item_id}", response_model=Item)
 def patch_item(item_id: int, data: ItemPatch):
-    item = shop.patch_item(item_id, data)
+    with metrics.stage("item_update"):
+        item = shop.patch_item(item_id, data)
     if item is None:
         return Response(status_code=304)
     return item
@@ -92,7 +124,9 @@ def patch_item(item_id: int, data: ItemPatch):
 
 @app.delete("/item/{item_id}")
 def delete_item(item_id: int):
-    shop.delete_item(item_id)
+    with metrics.stage("item_deletion"):
+        shop.delete_item(item_id)
+    metrics.deletions.inc()
     return Response(status_code=200)
 
 

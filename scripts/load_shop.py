@@ -24,6 +24,7 @@ class ShopLoad:
         while time.monotonic() < deadline:
             for response in (
                 self.client.get("/item"),
+                self.client.get("/cart", params={"limit": 10}),
                 self.client.get(f"/item/{item_id}"),
                 self.client.post(f"/cart/{cart_id}/add/{item_id}"),
                 self.client.get(f"/cart/{cart_id}"),
@@ -33,6 +34,21 @@ class ShopLoad:
             missing = self.client.get("/item/0")
             if missing.status_code != 404:
                 raise RuntimeError(f"Expected 404, received {missing.status_code}")
+            deleted = self.client.delete(f"/item/{item_id}")
+            deleted.raise_for_status()
+            unavailable_cart = self.client.get(f"/cart/{cart_id}")
+            unavailable_cart.raise_for_status()
+            if unavailable_cart.json()["price"] != 0:
+                raise RuntimeError("Deleted item still contributes to cart value")
+            unavailable_add = self.client.post(f"/cart/{cart_id}/add/{item_id}")
+            if unavailable_add.status_code != 404:
+                raise RuntimeError(
+                    f"Expected 404, received {unavailable_add.status_code}"
+                )
+            restored = self.client.put(
+                f"/item/{item_id}", json={"name": "Load item", "price": 10}
+            )
+            restored.raise_for_status()
             cycles += 1
             time.sleep(interval)
         return cycles
