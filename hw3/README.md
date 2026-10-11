@@ -1,7 +1,4 @@
 # ДЗ 3: Docker + Prometheus + Grafana
-
-Сервис: Shop API из ДЗ 2 (FastAPI).
-
 ## Запуск
 
 ```sh
