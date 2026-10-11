@@ -3,6 +3,7 @@ from typing import Annotated
 
 from fastapi import FastAPI, HTTPException, Query, Response
 from pydantic import NonNegativeInt, PositiveInt
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from .chat import router as chat_router
 from .models import Cart, CartCreated, Item, ItemData, ItemPatch
@@ -10,6 +11,9 @@ from .store import Store
 
 app = FastAPI(title="Shop API")
 app.include_router(chat_router)
+Instrumentator(excluded_handlers=["/metrics"]).instrument(app).expose(
+    app, include_in_schema=False
+)
 store = Store()
 
 PriceFilter = Annotated[float | None, Query(ge=0, allow_inf_nan=False)]
