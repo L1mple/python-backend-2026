@@ -1,0 +1,12 @@
+**
+!hw2/
+!hw2/hw/
+!hw2/hw/shop_api/
+!hw2/hw/shop_api/**
+!hw3/
+!hw3/main.py
+!hw3/requirements.txt
+!hw4/
+!hw4/isolation.py
+**/__pycache__/
+**/*.pyc

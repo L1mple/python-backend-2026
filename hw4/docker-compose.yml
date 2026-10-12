@@ -1,0 +1,44 @@
+name: korsnaike-hw4
+
+services:
+  shop:
+    extends:
+      file: ../hw3/docker-compose.yml
+      service: shop
+    build:
+      context: ..
+      dockerfile: hw4/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://shop:shop@postgres:5432/shop
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: shop
+      POSTGRES_PASSWORD: shop
+      POSTGRES_DB: shop
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shop -d shop"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  prometheus:
+    extends:
+      file: ../hw3/docker-compose.yml
+      service: prometheus
+
+  grafana:
+    extends:
+      file: ../hw3/docker-compose.yml
+      service: grafana
+
+volumes:
+  postgres-data:
+  prometheus-data:
+  grafana-data:

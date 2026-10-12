@@ -4,8 +4,10 @@
 
 Используется наш Shop API из `hw2/hw/shop_api/main.py`, включая WebSocket-чат.
 `hw3/main.py` подключает HTTP-метрики и эндпоинт `/metrics`.
-Данные магазина по-прежнему хранятся в памяти одного процесса и теряются
-при перезапуске сервиса.
+В ветке HW4 данные магазина перенесены в БД. Этот Compose использует
+SQLite в `/app/data/shop.db`; файл сохраняется при перезапуске контейнера,
+но не при его удалении. Для PostgreSQL с постоянным томом используйте
+[Compose из HW4](../hw4/README.md).
 
 ## Запуск
 
@@ -68,7 +70,8 @@ HTTP-метрики не измеряют длительность WebSocket-с�
 ```sh
 python3 -m venv .venv
 .venv/bin/pip install -r hw3/requirements.txt -r hw2/hw/requirements.txt
-PYTHONPATH=.:hw2/hw .venv/bin/python -m pytest \
+HW3_TEST_DIR=$(mktemp -d)
+DATABASE_URL="sqlite:///$HW3_TEST_DIR/shop.db" PYTHONPATH=.:hw2/hw .venv/bin/python -m pytest \
   hw2/hw/test_homework2.py hw3/test_monitoring.py -v
 ```
 
