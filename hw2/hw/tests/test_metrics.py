@@ -50,7 +50,7 @@ def test_http_errors_are_counted(client: TestClient, path: str, handler: str, st
 
 def test_unhandled_error_is_counted(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     cart_id = client.post("/cart").json()["id"]
-    monkeypatch.setattr(main.store, "get_cart", Mock(side_effect=RuntimeError("Test failure")))
+    monkeypatch.setattr(main.ShopStore, "get_cart", Mock(side_effect=RuntimeError("Test failure")))
     labels = {"handler": "/cart/{cart_id}", "method": "GET", "status": "500"}
     before = metric_value(client, "http_requests_total", labels)
     with TestClient(main.app, raise_server_exceptions=False) as error_client:

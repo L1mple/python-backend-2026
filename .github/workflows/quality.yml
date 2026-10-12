@@ -5,6 +5,7 @@ on:
     paths:
       - 'hw2/hw/**'
       - 'hw3/**'
+      - 'hw4/**'
       - 'monitoring/**'
       - 'Dockerfile'
       - '.dockerignore'
@@ -18,6 +19,7 @@ on:
     paths:
       - 'hw2/hw/**'
       - 'hw3/**'
+      - 'hw4/**'
       - 'monitoring/**'
       - 'Dockerfile'
       - '.dockerignore'
@@ -39,6 +41,21 @@ jobs:
         python-version: ['3.13', '3.14']
     env:
       UV_PYTHON: ${{ matrix.python-version }}
+      HW4_TEST_DATABASE_URL: postgresql+psycopg://shop:shop@127.0.0.1:7432/shop
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: shop
+          POSTGRES_USER: shop
+          POSTGRES_PASSWORD: shop
+        ports:
+          - 7432:5432
+        options: >-
+          --health-cmd "pg_isready -U shop -d shop"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -52,5 +69,9 @@ jobs:
         run: make lint
       - name: Run instructor and additional tests
         run: make test
+      - name: Check transaction isolation against PostgreSQL
+        run: make demo-hw4
       - name: Validate Docker Compose configuration
         run: docker compose config --quiet
+      - name: Build Shop API image with locked dependencies
+        run: docker compose build shop-api

@@ -1,0 +1,51 @@
+PostgreSQL 16.12 (Debian 16.12-1.pgdg13+1)
+Two independent PostgreSQL connections confirmed
+
+Dirty read / READ UNCOMMITTED
+  A: UPDATE 100 -> 999, without COMMIT
+  B: SELECT -> 100; A: ROLLBACK; B: SELECT -> 100
+  PASS: dirty read is absent (PostgreSQL maps READ UNCOMMITTED to READ COMMITTED)
+
+Dirty read / READ COMMITTED
+  A: UPDATE 100 -> 999, without COMMIT
+  B: SELECT -> 100; A: ROLLBACK; B: SELECT -> 100
+  PASS: dirty read is absent (PostgreSQL maps READ UNCOMMITTED to READ COMMITTED)
+
+Non-repeatable read / READ COMMITTED
+  A: SELECT -> 100; B: UPDATE -> 200, COMMIT; A: SELECT -> 200
+  PASS: non-repeatable read is present
+  A: new transaction sees committed value 200
+
+Non-repeatable read / REPEATABLE READ
+  A: SELECT -> 100; B: UPDATE -> 200, COMMIT; A: SELECT -> 100
+  PASS: non-repeatable read is absent
+  A: new transaction sees committed value 200
+
+Phantom read / READ COMMITTED
+  A: COUNT -> 2; B: INSERT matching row, COMMIT; A: COUNT -> 3
+  PASS: phantom read is present
+  A: new transaction sees 3 rows
+
+Phantom read / REPEATABLE READ
+  A: COUNT -> 2; B: INSERT matching row, COMMIT; A: COUNT -> 2
+  PASS: phantom read is absent
+  A: new transaction sees 3 rows
+
+Phantom read / SERIALIZABLE
+  A: COUNT -> 2; B: INSERT matching row, COMMIT; A: COUNT -> 2
+  PASS: phantom read is absent
+  A: new transaction sees 3 rows
+
+Serialization anomaly (write skew) / REPEATABLE READ
+  Rule: total balance must stay >= 100; withdraw 100 only when total >= 200
+  A: total = 200; B: total = 200, before either COMMIT
+  PASS: both transactions committed, total = 0; the rule was violated
+
+Serialization anomaly (write skew) / SERIALIZABLE
+  Rule: total balance must stay >= 100; withdraw 100 only when total >= 200
+  A: total = 200; B: total = 200, before either COMMIT
+  B: PostgreSQL rejected COMMIT with SQLSTATE 40001 (serialization_failure)
+  PASS: one transaction rolled back, total = 100; the rule was preserved
+  B: retry reads total = 100 and refuses the withdrawal; rule still holds
+
+ALL 9 SCENARIOS PASSED

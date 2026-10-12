@@ -1,5 +1,7 @@
 # Основные зависимости для ASGI приложения
-fastapi>=0.117.1
+fastapi>=0.121.0
+psycopg[binary]>=3.2,<4
+sqlalchemy>=2.0,<3
 prometheus-fastapi-instrumentator>=7.1.0,<8
 uvicorn>=0.24.0
 websockets>=15.0.1

@@ -1,62 +1,102 @@
-"""In-memory shop data. Cart views reflect current item names and prices."""
+"""Shop queries. Cart views reflect current item names, prices and deletion."""
 
-from itertools import count
 from math import fsum
 
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from .database import CartLineRecord, CartRecord, ItemRecord
 from .models import Cart, CartItem, Item, ItemData, ItemPatch
 
 
 class ShopStore:
-    def __init__(self) -> None:
-        self.items: dict[int, Item] = {}
-        self.carts: dict[int, dict[int, int]] = {}
-        self._item_ids = count(1)
-        self._cart_ids = count(1)
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def get_item(self, item_id: int, *, lock: bool = False) -> ItemRecord | None:
+        query = select(ItemRecord).where(ItemRecord.id == item_id)
+        if lock:
+            query = query.with_for_update()
+        return self.session.scalar(query)
+
+    def list_items(
+        self,
+        offset: int,
+        limit: int,
+        min_price: float | None,
+        max_price: float | None,
+        show_deleted: bool,
+    ) -> list[Item]:
+        query = select(ItemRecord).order_by(ItemRecord.id)
+        if not show_deleted:
+            query = query.where(ItemRecord.deleted.is_(False))
+        if min_price is not None:
+            query = query.where(ItemRecord.price >= min_price)
+        if max_price is not None:
+            query = query.where(ItemRecord.price <= max_price)
+        return [
+            Item.model_validate(row, from_attributes=True)
+            for row in self.session.scalars(query.offset(offset).limit(limit))
+        ]
 
     def create_item(self, data: ItemData) -> Item:
-        item = Item(id=next(self._item_ids), **data.model_dump())
-        self.items[item.id] = item
-        return item
+        row = ItemRecord(**data.model_dump())
+        self.session.add(row)
+        self.session.flush()
+        return Item.model_validate(row, from_attributes=True)
 
-    def replace_item(self, item_id: int, data: ItemData) -> Item:
-        item = Item(id=item_id, **data.model_dump())
-        self.items[item_id] = item
-        return item
+    def replace_item(self, row: ItemRecord, data: ItemData) -> Item:
+        row.name, row.price, row.deleted = data.name, data.price, data.deleted
+        return Item.model_validate(row, from_attributes=True)
 
-    def patch_item(self, item_id: int, data: ItemPatch) -> Item:
-        item = self.items[item_id]
+    def patch_item(self, row: ItemRecord, data: ItemPatch) -> Item:
         if data.name is not None:
-            item.name = data.name
+            row.name = data.name
         if data.price is not None:
-            item.price = data.price
-        return item
+            row.price = data.price
+        return Item.model_validate(row, from_attributes=True)
 
     def create_cart(self) -> int:
-        cart_id = next(self._cart_ids)
-        self.carts[cart_id] = {}
-        return cart_id
+        row = CartRecord()
+        self.session.add(row)
+        self.session.flush()
+        return row.id
+
+    def get_cart_record(self, cart_id: int, *, lock: bool = False) -> CartRecord | None:
+        query = select(CartRecord).where(CartRecord.id == cart_id)
+        if lock:
+            query = query.with_for_update()
+        return self.session.scalar(query)
+
+    def cart_ids(self) -> list[int]:
+        return list(self.session.scalars(select(CartRecord.id).order_by(CartRecord.id)))
 
     def get_cart(self, cart_id: int) -> Cart:
-        quantities = self.carts[cart_id]
+        rows = self.session.execute(
+            select(ItemRecord, CartLineRecord.quantity)
+            .join(CartLineRecord, CartLineRecord.item_id == ItemRecord.id)
+            .where(CartLineRecord.cart_id == cart_id)
+            .order_by(CartLineRecord.id)
+        ).all()
         return Cart(
             id=cart_id,
             items=[
-                CartItem(
-                    id=item_id,
-                    name=self.items[item_id].name,
-                    quantity=quantity,
-                    available=not self.items[item_id].deleted,
-                )
-                for item_id, quantity in quantities.items()
+                CartItem(id=row.id, name=row.name, quantity=quantity, available=not row.deleted)
+                for row, quantity in rows
             ],
-            price=fsum(
-                self.items[item_id].price * quantity
-                for item_id, quantity in quantities.items()
-                if not self.items[item_id].deleted
-            ),
+            price=fsum(row.price * quantity for row, quantity in rows if not row.deleted),
         )
 
     def add_to_cart(self, cart_id: int, item_id: int) -> Cart:
-        quantities = self.carts[cart_id]
-        quantities[item_id] = quantities.get(item_id, 0) + 1
+        # The caller locks the cart row, serializing concurrent additions to this cart.
+        line = self.session.scalar(
+            select(CartLineRecord).where(
+                CartLineRecord.cart_id == cart_id, CartLineRecord.item_id == item_id
+            )
+        )
+        if line is None:
+            self.session.add(CartLineRecord(cart_id=cart_id, item_id=item_id, quantity=1))
+        else:
+            line.quantity += 1
+        self.session.flush()
         return self.get_cart(cart_id)

@@ -2,6 +2,23 @@
 
 В этом репозитории будут размещены домашние задания по курсу "Python Backend".
 
+## Четвёртая домашняя работа
+
+Ветка `codex/hw4-database` создана от `codex/hw3-monitoring`.
+Товары и корзины Shop API хранятся в PostgreSQL через SQLAlchemy.
+Скрипт демонстрирует уровни изоляции и проверяет 9 сценариев транзакций.
+
+```bash
+make install
+make up-hw4     # API, PostgreSQL, Prometheus и Grafana
+make test-hw4   # тесты API на PostgreSQL и сценарии изоляции
+make lint
+make down-hw4   # остановить контейнеры, сохранив данные
+```
+
+**Проверка всех трёх пунктов задания, команды и результаты:**
+[описание ДЗ №4](hw4/README.md).
+
 ## Третья домашняя работа
 
 Ветка `codex/hw3-monitoring` создана от `codex/hw2-submission`.

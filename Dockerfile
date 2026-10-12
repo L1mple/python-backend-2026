@@ -3,11 +3,12 @@ FROM ghcr.io/astral-sh/uv:0.9.17-python3.13-bookworm-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_LINK_MODE=copy \
+    UV_HTTP_TIMEOUT=600 \
     PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
-RUN uv sync --locked --no-dev --no-install-project
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --no-dev --no-install-project
 COPY hw2/hw/shop_api ./hw2/hw/shop_api
 
 USER 10001:10001
