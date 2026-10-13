@@ -1,7 +1,9 @@
 # Основные зависимости для ASGI приложения
-fastapi>=0.117.1
+fastapi>=0.121.0
 uvicorn>=0.24.0
 prometheus-fastapi-instrumentator==7.1.0
+SQLAlchemy>=2.0,<2.1
+psycopg[binary]>=3.2,<4
 
 # Зависимости для тестирования
 pytest>=7.4.0

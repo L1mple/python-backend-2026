@@ -1,0 +1,11 @@
+Dirty read / READ UNCOMMITTED: writer has not committed 200, reader sees 100
+Dirty read / READ COMMITTED: writer has not committed 200, reader sees 100
+Non-repeatable read / READ COMMITTED: 100 -> 200
+Non-repeatable read / REPEATABLE READ: 100 -> 100
+Phantom read / READ COMMITTED: row count 1 -> 2
+Phantom read / REPEATABLE READ: row count 1 -> 1
+Phantom read / SERIALIZABLE: row count 1 -> 1
+Write skew / REPEATABLE READ: doctors on call = 0, serialization failure = False
+Write skew / SERIALIZABLE: doctors on call = 1, serialization failure = True
+Retry: one doctor remains on call, so the second cannot leave
+All transaction examples passed
