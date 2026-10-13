@@ -17,4 +17,5 @@ prometheus-fastapi-instrumentator>=8.1.0
 # Зависимости для работы с БД
 sqlalchemy[asyncio]>=2.0.25
 asyncpg>=0.29.0
+aiosqlite>=0.20.0
 greenlet>=3.0.0
