@@ -7,14 +7,19 @@ services:
       context: ..
       dockerfile: hw3/Dockerfile
     restart: always
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:password@postgres:5432/hw4_db
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
-      - 127.0.0.1:8000:8000
+      - "127.0.0.1:8000:8000"
 
   grafana:
     image: grafana/grafana:latest
     restart: always
     ports:
-      - 127.0.0.1:3000:3000
+      - "127.0.0.1:3000:3000"
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
@@ -30,4 +35,20 @@ services:
       - "--web.console.templates=/usr/share/prometheus/consoles"
     restart: always
     ports:
-      - 127.0.0.1:9090:9090
+      - "127.0.0.1:9090:9090"
+
+  postgres:
+    image: postgres:15
+    restart: always
+    container_name: hw4_postgres
+    environment:
+      POSTGRES_DB: hw4_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "7432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d hw4_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5

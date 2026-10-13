@@ -2,19 +2,25 @@ from decimal import Decimal
 from http import HTTPStatus
 from typing import Annotated
 
-from fastapi import APIRouter, Response, Query, HTTPException
+from fastapi import APIRouter, Response, Query, HTTPException, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from shop_api.cart.contracts import CartResponse
 
-import store.cart as cart_repo
-import store.item as item_repo
+import store.db.cart as cart_repo
+import store.db.item as item_repo
+
+from store.db.db import get_async_session
 
 router = APIRouter()
 
 
 @router.post("", status_code=HTTPStatus.CREATED)
-async def add_cart(response: Response) -> CartResponse:
-    entity = cart_repo.add()
+async def add_cart(
+        response: Response,
+        session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> CartResponse:
+    entity = await cart_repo.add(session)
 
     response.headers["Location"] = f"/cart/{entity.id}"
 
@@ -32,8 +38,11 @@ async def add_cart(response: Response) -> CartResponse:
         },
     },
 )
-async def get_cart(cart_id: int) -> CartResponse:
-    entity = cart_repo.get_one(cart_id)
+async def get_cart(
+        cart_id: int,
+        session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> CartResponse:
+    entity = await cart_repo.get_one(session, cart_id)
     if not entity:
         raise HTTPException(
             HTTPStatus.NOT_FOUND,
@@ -44,6 +53,7 @@ async def get_cart(cart_id: int) -> CartResponse:
 
 @router.get("", status_code=HTTPStatus.OK)
 async def get_cart_list(
+        session: Annotated[AsyncSession, Depends(get_async_session)],
         offset: Annotated[int, Query(ge=0)] = 0,
         limit: Annotated[int, Query(ge=1)] = 10,
         min_price: Annotated[Decimal | None, Query(ge=0)] = None,
@@ -51,45 +61,39 @@ async def get_cart_list(
         min_quantity: Annotated[int | None, Query(ge=0)] = None,
         max_quantity: Annotated[int | None, Query(ge=0)] = None,
 ) -> list[CartResponse]:
-    return [CartResponse.from_entity(e) for e in
-            cart_repo.get_many(
-                offset,
-                limit,
-                min_price,
-                max_price,
-                min_quantity,
-                max_quantity
-            )]
+    entities = await cart_repo.get_many(
+        session,
+        offset,
+        limit,
+        min_price,
+        max_price,
+        min_quantity,
+        max_quantity,
+    )
+    return [CartResponse.from_entity(e) for e in entities]
 
 
 @router.post("/{cart_id}/add/{item_id}", status_code=HTTPStatus.OK)
 async def add_cart_item(
         cart_id: int,
         item_id: int,
+        session: Annotated[AsyncSession, Depends(get_async_session)],
         quantity: Annotated[int, Query(ge=1)] = 1,
 ) -> CartResponse:
-    item = item_repo.get_one(item_id)
+    item = await item_repo.get_one(session, item_id)
     if not item:
         raise HTTPException(
             HTTPStatus.NOT_FOUND,
             f"Request resource /item/{item_id} was not found",
         )
 
-    cart = cart_repo.get_one(cart_id)
+    cart = await cart_repo.get_one(session, cart_id)
     if not cart:
         raise HTTPException(
             HTTPStatus.NOT_FOUND,
             f"Request resource /cart/{cart_id} was not found",
         )
 
-    try:
-        cart.add_item(item=item, quantity=quantity)
-    except ValueError as e:
-        raise HTTPException(
-            HTTPStatus.UNPROCESSABLE_ENTITY,
-            f"{str(e)}"
-        )
-
-    cart_repo.save(cart)
+    cart = await cart_repo.add_item(session, cart_id, item_id, quantity)
 
     return CartResponse.from_entity(cart)

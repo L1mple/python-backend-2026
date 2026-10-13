@@ -2,7 +2,8 @@ from decimal import Decimal
 from http import HTTPStatus
 from typing import Annotated
 
-from fastapi import APIRouter, Response, Query, HTTPException
+from fastapi import APIRouter, Response, Query, HTTPException, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from .contracts import (
     ItemRequest,
@@ -10,14 +11,20 @@ from .contracts import (
     PatchItemRequest
 )
 
-import store.item as item_repo
+import store.db.item as item_repo
+
+from store.db.db import get_async_session
 
 router = APIRouter()
 
 
 @router.post("", status_code=HTTPStatus.CREATED)
-async def add_item(info: ItemRequest, response: Response) -> ItemResponse:
-    entity = item_repo.add(info.as_item_info())
+async def add_item(
+        info: ItemRequest,
+        response: Response,
+        session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> ItemResponse:
+    entity = await item_repo.add(session, info.as_item_info())
 
     response.headers["Location"] = f"/item/{entity.id}"
 
@@ -35,8 +42,11 @@ async def add_item(info: ItemRequest, response: Response) -> ItemResponse:
         },
     },
 )
-async def get_item(item_id: int) -> ItemResponse:
-    entity = item_repo.get_one(item_id)
+async def get_item(
+        item_id: int,
+        session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> ItemResponse:
+    entity = await item_repo.get_one(session, item_id)
 
     if not entity:
         raise HTTPException(
@@ -48,20 +58,22 @@ async def get_item(item_id: int) -> ItemResponse:
 
 @router.get("", status_code=HTTPStatus.OK)
 async def get_item_list(
+        session: Annotated[AsyncSession, Depends(get_async_session)],
         offset: Annotated[int, Query(ge=0)] = 0,
         limit: Annotated[int, Query(ge=1)] = 10,
         min_price: Annotated[Decimal | None, Query(ge=0)] = None,
         max_price: Annotated[Decimal | None, Query(ge=0)] = None,
         show_deleted: bool = False,
 ) -> list[ItemResponse]:
-    return [ItemResponse.from_entity(e) for e in
-            item_repo.get_many(
-                offset,
-                limit,
-                min_price,
-                max_price,
-                show_deleted
-            )]
+    entities = await item_repo.get_many(
+        session,
+        offset,
+        limit,
+        min_price,
+        max_price,
+        show_deleted,
+    )
+    return [ItemResponse.from_entity(e) for e in entities]
 
 
 @router.put("/{item_id}",
@@ -73,8 +85,12 @@ async def get_item_list(
                     "description": "Failed to modify item as one was not found",
                 },
             }, )
-async def put_item(item_id: int, info: ItemRequest) -> ItemResponse:
-    entity = item_repo.update(item_id, info.as_item_info())
+async def put_item(
+        item_id: int,
+        info: ItemRequest,
+        session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> ItemResponse:
+    entity = await item_repo.update(session, item_id, info.as_item_info())
 
     if not entity:
         raise HTTPException(
@@ -94,8 +110,12 @@ async def put_item(item_id: int, info: ItemRequest) -> ItemResponse:
                       "description": "Failed to modify item as one was not found",
                   },
               }, )
-async def patch_item(item_id: int, info: PatchItemRequest) -> ItemResponse:
-    entity = item_repo.patch(item_id, info.as_patch_item_info())
+async def patch_item(
+        item_id: int,
+        info: PatchItemRequest,
+        session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> ItemResponse:
+    entity = await item_repo.patch(session, item_id, info.as_patch_item_info())
 
     if not entity:
         raise HTTPException(
@@ -107,6 +127,9 @@ async def patch_item(item_id: int, info: PatchItemRequest) -> ItemResponse:
 
 
 @router.delete("/{item_id}", status_code=HTTPStatus.OK)
-async def delete_item(item_id: int) -> Response:
-    item_repo.delete(item_id)
+async def delete_item(
+        item_id: int,
+        session: Annotated[AsyncSession, Depends(get_async_session)],
+) -> Response:
+    await item_repo.delete(session, item_id)
     return Response("")
