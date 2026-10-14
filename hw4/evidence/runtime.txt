@@ -1,0 +1,41 @@
+HW4 Docker runtime verification — 2026-10-12
+
+docker compose build shop-api
+PASS: image built with locked dependencies
+
+docker compose up -d --wait
+SERVICE      STATE     HEALTH    HOST PORT
+postgres     running   healthy   127.0.0.1:7432
+shop-api     running   healthy   127.0.0.1:8000
+prometheus   running   healthy   127.0.0.1:9090
+grafana      running   healthy   127.0.0.1:3000
+
+HTTP persistence check (steps described in hw4/README.md):
+POST /item -> 201, Location; item 1, name "HW4 persistence check", price 12.5
+POST /cart -> 201, Location; cart 1
+POST /cart/1/add/1 twice -> quantity 2, total price 25
+POST /item -> item 2; DELETE /item/2 -> 200
+
+docker compose restart postgres shop-api
+docker compose up -d --wait postgres shop-api
+PASS: same IDs, item data, cart contents, quantity, price and soft deletion survived; /metrics works
+
+docker compose down
+docker compose up -d --wait
+PASS: same IDs, item data, cart contents, quantity, price and soft deletion survived; /metrics works
+
+PostgreSQL rows after container recreation:
+items:
+ id | name                  | price | deleted
+  1 | HW4 persistence check |  12.5 | false
+  2 | HW4 soft-delete check |   100 | true
+carts:
+ id
+  1
+cart_items:
+ cart_id | item_id | quantity
+       1 |       1 |        2
+leftover_test_schemas: 0
+
+PASS: Prometheus up{job="shop-api"} = 1
+PASS: Grafana provisioned shop-overview and shop-latency
