@@ -1,0 +1,6 @@
+**
+!requirements.txt
+!shop_api/
+!shop_api/**
+**/__pycache__/
+**/*.pyc
