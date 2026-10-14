@@ -1,0 +1,260 @@
+{
+  "uid": "shop-api",
+  "title": "Shop API",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "refresh": "10s",
+  "templating": {
+    "list": [
+      {
+        "name": "handler",
+        "label": "handler",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(http_requests_total, handler)",
+        "query": {
+          "query": "label_values(http_requests_total, handler)",
+          "refId": "handler"
+        },
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "sort": 1
+      },
+      {
+        "name": "percentile",
+        "label": "percentile",
+        "type": "custom",
+        "query": "50,90,95,99",
+        "current": {
+          "text": "99",
+          "value": "99"
+        },
+        "options": [
+          {
+            "text": "50",
+            "value": "50",
+            "selected": false
+          },
+          {
+            "text": "90",
+            "value": "90",
+            "selected": false
+          },
+          {
+            "text": "95",
+            "value": "95",
+            "selected": false
+          },
+          {
+            "text": "99",
+            "value": "99",
+            "selected": true
+          }
+        ]
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Запросы в минуту",
+      "description": "Число запросов в минуту по ручке, методу и коду ответа",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (method, handler, status) (rate(http_requests_total{handler=~\"$handler\"}[1m])) * 60",
+          "legendFormat": "{{method}} {{handler}} {{status}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqpm",
+          "custom": {
+            "fillOpacity": 15
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Время ответа, p$percentile",
+      "description": "Перцентиль времени ответа по ручке и методу; перцентиль выбирается переменной сверху",
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile($percentile / 100, sum by (le, method, handler) (rate(http_request_duration_seconds_bucket{handler=~\"$handler\"}[1m])))",
+          "legendFormat": "{{method}} {{handler}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "fillOpacity": 15
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "min",
+            "mean",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Ошибки 4XX",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 9
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (method, handler, status) (rate(http_requests_total{status=~\"4..\", handler=~\"$handler\"}[1m])) * 60",
+          "legendFormat": "{{method}} {{handler}} {{status}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqpm",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          },
+          "custom": {
+            "fillOpacity": 25
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "max",
+            "min"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Ошибки 5XX",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 9
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (method, handler, status) (rate(http_requests_total{status=~\"5..\", handler=~\"$handler\"}[1m])) * 60",
+          "legendFormat": "{{method}} {{handler}} {{status}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqpm",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "red"
+          },
+          "custom": {
+            "fillOpacity": 25
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "max",
+            "min"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    }
+  ]
+}
