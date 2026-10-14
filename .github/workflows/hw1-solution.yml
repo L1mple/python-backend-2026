@@ -1,0 +1,23 @@
+name: HW1 solution
+
+on:
+  pull_request:
+    branches: [main, hw2, hw3]
+    paths: ['hw1/**', '.github/workflows/hw1-solution.yml']
+  push:
+    branches: [hw1]
+    paths: ['hw1/**', '.github/workflows/hw1-solution.yml']
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.13', '3.14']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install -r hw1/requirements.txt
+      - run: python -m pytest hw1 -v
