@@ -1,0 +1,29 @@
+name: HW3 monitoring
+on:
+  push:
+    branches: [hw3]
+  pull_request:
+    branches: [main, hw2, hw3]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.13', '3.14']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Test shop and monitoring
+        env:
+          PYTHONPATH: hw2/hw
+        run: uv run --no-project --python ${{ matrix.python-version }} --with-requirements hw2/hw/requirements.txt pytest -q hw2/hw
+      - name: Build and scrape live stack
+        run: |
+          docker compose -p python-backend-hw3 up -d --build --wait
+          uv run --no-project --python ${{ matrix.python-version }} --with httpx scripts/load_shop.py --duration 15
+          curl --fail http://127.0.0.1:8000/metrics | grep http_requests_total
+          curl --fail --get --data-urlencode 'query=up{job="shop"}' http://127.0.0.1:9090/api/v1/query | python -c 'import json,sys; r=json.load(sys.stdin)["data"]["result"]; assert len(r)==1 and r[0]["value"][1]=="1"'
+      - if: always()
+        run: docker compose -p python-backend-hw3 down

@@ -1,0 +1,6 @@
+.git
+.venv*
+.superpowers
+.beads
+**/__pycache__
+docs/screenshots
