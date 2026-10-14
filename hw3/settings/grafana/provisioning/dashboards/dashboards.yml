@@ -1,0 +1,9 @@
+apiVersion: 1
+
+providers:
+  - name: Shop API
+    folder: HW3
+    type: file
+    editable: false
+    options:
+      path: /etc/grafana/dashboards
