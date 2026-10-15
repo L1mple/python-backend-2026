@@ -1,24 +1,90 @@
+import os
 import random
 import string
 from http import HTTPStatus
-from fastapi import FastAPI, HTTPException, Query, WebSocket, Response, WebSocketDisconnect
+from typing import AsyncGenerator, Optional
+from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, Response, WebSocketDisconnect
 from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional
+from sqlalchemy import ForeignKey, select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, selectinload
+from sqlalchemy.pool import NullPool
 from prometheus_fastapi_instrumentator import Instrumentator
+
+
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql+asyncpg://postgres:password@localhost:5432/shop_db",
+)
+
+engine = create_async_engine(DATABASE_URL, echo=False, poolclass=NullPool)
+async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    async with async_session_maker() as session:
+        yield session
+
+
+
+class ItemORM(Base):
+    __tablename__ = "items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str]
+    price: Mapped[float]
+    deleted: Mapped[bool] = mapped_column(default=False)
+
+
+class CartORM(Base):
+    __tablename__ = "carts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    items: Mapped[list["CartItemORM"]] = relationship(
+        back_populates="cart",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+
+class CartItemORM(Base):
+    __tablename__ = "cart_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    cart_id: Mapped[int] = mapped_column(ForeignKey("carts.id"))
+    item_id: Mapped[int] = mapped_column(ForeignKey("items.id"))
+    quantity: Mapped[int] = mapped_column(default=1)
+
+    cart: Mapped[CartORM] = relationship(back_populates="items")
+    item: Mapped[ItemORM] = relationship(lazy="selectin")
+
 
 app = FastAPI(title="Shop API")
 
 Instrumentator().instrument(app).expose(app)
 
+
+@app.on_event("startup")
+async def on_startup() -> None:
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
 class ItemCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     name: str
     price: float = Field(ge = 0)
 
 class Item(ItemCreate):
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
     id: int
     deleted: bool = False
 
 class ItemUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     name: str
     price: float = Field(ge = 0)
 
@@ -29,133 +95,130 @@ class ItemPatch(BaseModel):
 
 
 class CartItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: int
     name: str
     quantity: int
     available: bool
 
 class Cart(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: int
     items: list[CartItem]
     price: float
 
-items_dct = dict()
-carts_dct = dict()
-next_item_id = 1
-next_cart_id = 1
 
-
-def get_next_item_id() -> int:
-    global next_item_id
-    item_id = next_item_id
-    next_item_id += 1
-    return item_id
-
-
-def get_next_cart_id() -> int:
-    global next_cart_id
-    cart_id = next_cart_id
-    next_cart_id += 1
-    return cart_id
-
-
-def build_cart(cart_id: int) -> Cart:
-    if cart_id not in carts_dct:
+async def build_cart(cart_id: int, session: AsyncSession) -> Cart:
+    result = await session.execute(
+        select(CartORM)
+        .where(CartORM.id == cart_id)
+        .options(selectinload(CartORM.items).selectinload(CartItemORM.item))
+    )
+    cart_orm = result.scalar_one_or_none()
+    if cart_orm is None:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND)
+
     cart_items = []
-    total_price = 0
-    for item_id, quantity in carts_dct[cart_id].items():
-        item = items_dct.get(item_id)
-        if item is None:
-            continue
-        cart_items.append(CartItem(id=item_id, name = item.name, quantity = quantity, available = not item.deleted))
-        total_price += item.price * quantity
-    return Cart(id = cart_id, items = cart_items, price = total_price)
+    total_price = 0.0
+    for ci in cart_orm.items:
+        cart_items.append(CartItem(id=ci.item.id,name=ci.item.name, quantity=ci.quantity,available=not ci.item.deleted,))
+        total_price += ci.item.price * ci.quantity
+
+    return Cart(id=cart_orm.id, items=cart_items, price=total_price)
 
 
 # Item(REST)
 
-@app.post("/item", status_code=HTTPStatus.CREATED, response_model = Item)
-def create_item(item: ItemCreate) -> Item:
-    item_id = get_next_item_id()
-    new_item = Item(id = item_id, name = item.name, price = item.price, deleted=False)
-    items_dct[item_id] = new_item
-    return new_item
+@app.post("/item", status_code=HTTPStatus.CREATED, response_model=Item)
+async def create_item(item: ItemCreate, session: AsyncSession = Depends(get_session)) -> Item:
+    orm_item = ItemORM(name=item.name, price=item.price, deleted=False)
+    session.add(orm_item)
+    await session.commit()
+    await session.refresh(orm_item)
+    return Item.model_validate(orm_item)
 
-@app.get("/item/{item_id}", response_model = Item)
-def get_item(item_id: int) -> Item:
-    item = items_dct.get(item_id)
-    if item is None or item.deleted:
+@app.get("/item/{item_id}", response_model=Item)
+async def get_item(item_id: int, session: AsyncSession = Depends(get_session)) -> Item:
+    orm_item = await session.get(ItemORM, item_id)
+    if orm_item is None or orm_item.deleted:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND)
-    return item
+    return Item.model_validate(orm_item)
 
 
-@app.get("/item", response_model = list[Item])
-def get_items(offset: int = Query(0, ge=0), limit: int = Query(10, gt=0), min_price: Optional[float] = Query(None, ge=0), max_price: Optional[float] = Query(None, ge=0), show_deleted: bool = Query(False)) -> list[Item]:
-    result = []
-    for item in items_dct.values():
-        if not show_deleted and item.deleted:
-            continue
-        if min_price is not None and item.price < min_price:
-            continue
-        if max_price is not None and item.price > max_price:
-            continue
-        result.append(item)
+@app.get("/item", response_model=list[Item])
+async def get_items(offset: int = Query(0, ge=0), limit: int = Query(10, gt=0), min_price: Optional[float] = Query(None, ge=0), max_price: Optional[float] = Query(None, ge=0), show_deleted: bool = Query(False), session: AsyncSession = Depends(get_session),) -> list[Item]:
+    stmt = select(ItemORM)
+    if not show_deleted:
+        stmt = stmt.where(ItemORM.deleted.is_(False))
+    if min_price is not None:
+        stmt = stmt.where(ItemORM.price >= min_price)
+    if max_price is not None:
+        stmt = stmt.where(ItemORM.price <= max_price)
+    stmt = stmt.order_by(ItemORM.id).offset(offset).limit(limit)
 
-    result.sort(key=lambda x: x.id)
-    return result[offset : offset + limit]
+    result = await session.execute(stmt)
+    return [Item.model_validate(row) for row in result.scalars().all()]
 
-@app.put("/item/{item_id}", response_model = Item)
-def put_item(item_id: int, item: ItemUpdate) -> Item:
-    existing = items_dct.get(item_id)
-    if existing is None or existing.deleted:
+@app.put("/item/{item_id}", response_model=Item)
+async def put_item(item_id: int, item: ItemUpdate, session: AsyncSession = Depends(get_session)) -> Item:
+    orm_item = await session.get(ItemORM, item_id)
+    if orm_item is None or orm_item.deleted:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND)
-    updated = Item(id=item_id, name = item.name, price = item.price, deleted=existing.deleted)
-    items_dct[item_id] = updated
-    return updated
 
-@app.patch("/item/{item_id}", response_model = Item)
-def patch_item(item_id: int, patch: ItemPatch) -> Item:
-    existing = items_dct.get(item_id)
-    if existing is None:
+    orm_item.name = item.name
+    orm_item.price = item.price
+    await session.commit()
+    await session.refresh(orm_item)
+    return Item.model_validate(orm_item)
+
+
+@app.patch("/item/{item_id}", response_model=Item)
+async def patch_item(item_id: int, patch: ItemPatch, session: AsyncSession = Depends(get_session)) -> Item:
+    orm_item = await session.get(ItemORM, item_id)
+    if orm_item is None:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND)
-    if existing.deleted:
+    if orm_item.deleted:
         raise HTTPException(status_code=HTTPStatus.NOT_MODIFIED)
-    update_data = patch.model_dump(exclude_unset=True)
-    if not update_data:
-        return existing
-    updated = existing.model_copy(update = update_data)
-    items_dct[item_id] = updated
-    return updated
+    for field, value in patch.model_dump(exclude_unset=True).items():
+        setattr(orm_item, field, value)
+    await session.commit()
+    await session.refresh(orm_item)
+    return Item.model_validate(orm_item)
 
 
-@app.delete("/item/{item_id}", response_model = Item)
-def delete_item(item_id: int) -> Item:
-    item = items_dct.get(item_id)
-    if item is None:
+@app.delete("/item/{item_id}", response_model=Item)
+async def delete_item(item_id: int, session: AsyncSession = Depends(get_session)) -> Item:
+    orm_item = await session.get(ItemORM, item_id)
+    if orm_item is None:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND)
-    item.deleted = True
-    return item
+    orm_item.deleted = True
+    await session.commit()
+    await session.refresh(orm_item)
+    return Item.model_validate(orm_item)
 
 
 # Cart(REST)
 
 @app.post("/cart", status_code=HTTPStatus.CREATED)
-def create_cart(response: Response) -> dict[str, int]:
-    cart_id = get_next_cart_id()
-    carts_dct[cart_id] = dict()
-    response.headers['location'] = f"/cart/{cart_id}"
-    return {'id': cart_id}
+async def create_cart(response: Response, session: AsyncSession = Depends(get_session)) -> dict[str, int]:
+    orm_cart = CartORM()
+    session.add(orm_cart)
+    await session.commit()
+    await session.refresh(orm_cart)
+    response.headers['location'] = f"/cart/{orm_cart.id}"
+    return {'id': orm_cart.id}
 
-@app.get("/cart/{cart_id}", response_model = Cart)
-def get_cart(cart_id: int) -> Cart:
-    return build_cart(cart_id)
+@app.get("/cart/{cart_id}", response_model=Cart)
+async def get_cart(cart_id: int, session: AsyncSession = Depends(get_session)) -> Cart:
+    return await build_cart(cart_id, session)
 
-@app.get("/cart", response_model =list[Cart])
-def get_carts(offset: int = Query(0, ge=0), limit: int = Query(10, gt=0), min_price: Optional[float] = Query(None, ge=0), max_price: Optional[float] = Query(None, ge=0),  min_quantity: Optional[int] = Query(None, ge=0), max_quantity: Optional[int] = Query(None, ge=0)) -> list[Cart]:
-    result = []
-    for cart_id in sorted(carts_dct.keys()):
-        cart = build_cart(cart_id)
+@app.get("/cart", response_model=list[Cart])
+async def get_carts(offset: int = Query(0, ge=0), limit: int = Query(10, gt=0), min_price: Optional[float] = Query(None, ge=0), max_price: Optional[float] = Query(None, ge=0), min_quantity: Optional[int] = Query(None, ge=0), max_quantity: Optional[int] = Query(None, ge=0), session: AsyncSession = Depends(get_session),) -> list[Cart]:
+    result = await session.execute(select(CartORM.id).order_by(CartORM.id))
+    cart_ids = list(result.scalars().all())
+    carts = []
+    for cart_id in cart_ids:
+        cart = await build_cart(cart_id, session)
         if min_price is not None and cart.price < min_price:
             continue
         if max_price is not None and cart.price > max_price:
@@ -165,20 +228,30 @@ def get_carts(offset: int = Query(0, ge=0), limit: int = Query(10, gt=0), min_pr
             continue
         if max_quantity is not None and total_quantity > max_quantity:
             continue
-        result.append(cart)
+        carts.append(cart)
 
-    return result[offset : offset + limit]
+    return carts[offset : offset + limit]
 
-@app.post("/cart/{cart_id}/add/{item_id}", response_model = Cart)
-def add_item_to_cart(cart_id: int, item_id: int) -> Cart:
-    if cart_id not in carts_dct:
+@app.post("/cart/{cart_id}/add/{item_id}", response_model=Cart)
+async def add_item_to_cart(cart_id: int, item_id: int, session: AsyncSession = Depends(get_session)) -> Cart:
+    cart_orm = await session.get(CartORM, cart_id)
+    if cart_orm is None:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND)
-    item = items_dct.get(item_id)
-    if item is None or item.deleted:
+
+    item_orm = await session.get(ItemORM, item_id)
+    if item_orm is None or item_orm.deleted:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND)
-    cart = carts_dct[cart_id]
-    cart[item_id] = cart.get(item_id, 0) + 1
-    return build_cart(cart_id)
+
+    result = await session.execute(
+        select(CartItemORM).where(CartItemORM.cart_id == cart_id, CartItemORM.item_id == item_id,))
+    cart_item = result.scalar_one_or_none()
+    if cart_item is None:
+        session.add(CartItemORM(cart_id=cart_id, item_id=item_id, quantity=1))
+    else:
+        cart_item.quantity += 1
+
+    await session.commit()
+    return await build_cart(cart_id, session)
 
 # Web Sockets Chat
 
