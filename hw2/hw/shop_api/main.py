@@ -5,7 +5,7 @@ from http import HTTPStatus
 from typing import AsyncGenerator, Optional
 from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, Response, WebSocketDisconnect
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import ForeignKey, select
+from sqlalchemy import create_engine, ForeignKey, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, selectinload
 from sqlalchemy.pool import NullPool
@@ -286,3 +286,20 @@ async def chat_endpoint(websocket: WebSocket, chat_name: str) -> None:
             await chat_manager.broadcast(chat_name, websocket, message, username)
     except WebSocketDisconnect:
         chat_manager.disconnect(chat_name, websocket)
+
+
+def _init_db_sync() -> None:
+    """Создаёт таблицы синхронно при импорте модуля.
+
+    Нужно для тестов и CI, которые импортируют main.py,
+    но не запускают lifespan/startup event.
+    """
+    sync_url = DATABASE_URL.replace("+asyncpg", "+psycopg2")
+    sync_engine = create_engine(sync_url)
+    try:
+        Base.metadata.create_all(sync_engine)
+    finally:
+        sync_engine.dispose()
+
+
+_init_db_sync()
