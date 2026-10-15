@@ -2,6 +2,13 @@
 fastapi>=0.117.1
 uvicorn>=0.24.0
 
+prometheus-fastapi-instrumentator>=7.0.0
+
+# БД
+sqlalchemy[asyncio]>=2.0.0
+asyncpg>=0.29.0
+aiosqlite>=0.20.0
+
 # Зависимости для тестирования
 pytest>=7.4.0
 pytest-asyncio>=0.21.0

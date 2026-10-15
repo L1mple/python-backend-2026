@@ -1,0 +1,9 @@
+--- read committed
+first read: 100.0
+writer committed 777.0
+second read: 777.0
+
+--- repeatable read
+first read: 100.0
+writer committed 777.0
+second read: 100.0
