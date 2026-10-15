@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+pydantic
+prometheus-fastapi-instrumentator
+sqlalchemy>=2.0,<3.0
+pymysql>=1.1,<2.0
