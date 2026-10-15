@@ -12,6 +12,20 @@ on:
 jobs:
   test-hw2:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: shop_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     strategy:
       matrix:
         python-version: ["3.13", "3.14"]
@@ -31,9 +45,14 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Run tests
+    - name: Run tests with coverage
       working-directory: hw2/hw
       env:
         PYTHONPATH: ${{ github.workspace }}/hw2/hw
+        DATABASE_URL: postgresql+asyncpg://postgres:password@localhost:5432/shop_db
       run: |
-        pytest test_homework2.py -v
+        pytest \
+          --cov=shop_api \
+          --cov-report=term-missing \
+          --cov-fail-under=95 \
+          test_homework2.py new_test.py -v
