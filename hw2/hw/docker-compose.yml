@@ -5,9 +5,32 @@ services:
       context: .
       dockerfile: ./Dockerfile
       target: local
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-shop}:${POSTGRES_PASSWORD:-shop}@postgres:5432/${POSTGRES_DB:-shop}
     restart: always
     ports:
       - "8081:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-shop}
+      POSTGRES_USER: ${POSTGRES_USER:-shop}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-shop}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./migrations/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-shop} -d ${POSTGRES_DB:-shop}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: always
 
   prometheus:
     image: prom/prometheus:latest
@@ -42,5 +65,6 @@ services:
       - prometheus
 
 volumes:
+  postgres-data:
   prometheus-data:
   grafana-data:

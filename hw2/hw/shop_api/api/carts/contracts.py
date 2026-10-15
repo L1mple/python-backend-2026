@@ -1,6 +1,6 @@
 from pydantic import BaseModel
-from ...store import queries
-from ...store.models import Cart
+
+from ...store.models import CartItem, CartWithPrice
 
 
 class CartItemResponse(BaseModel):
@@ -9,6 +9,15 @@ class CartItemResponse(BaseModel):
     quantity: int
     available: bool
 
+    @staticmethod
+    def from_entity(cart_item: CartItem) -> "CartItemResponse":
+        return CartItemResponse(
+            id=cart_item.item_id,
+            name=cart_item.item.name,
+            quantity=cart_item.quantity,
+            available=not cart_item.item.deleted,
+        )
+
 
 class CartResponse(BaseModel):
     id: int
@@ -16,20 +25,10 @@ class CartResponse(BaseModel):
     price: float
 
     @staticmethod
-    def from_entity(cart: Cart):
-        items = []
-        for item_id, quantity in cart.item_id_to_count.items():
-            item = queries.get_item(item_id)
-            items.append(
-                CartItemResponse(
-                    id=item.id,
-                    name=item.name,
-                    quantity=quantity,
-                    available=not item.deleted,
-                )
-            )
+    def from_entity(cart_with_price: CartWithPrice) -> "CartResponse":
+        cart, price = cart_with_price
         return CartResponse(
             id=cart.id,
-            items=items,
-            price=queries.cart_price(cart),
+            items=[CartItemResponse.from_entity(cart_item) for cart_item in cart.items],
+            price=price,
         )

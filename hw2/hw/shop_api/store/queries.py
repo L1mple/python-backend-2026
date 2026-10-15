@@ -1,111 +1,188 @@
-from itertools import count
-from .models import Cart, Item
+from sqlalchemy import Select, Subquery, case, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload, selectinload
+
+from .models import Cart, CartItem, CartWithPrice, Item
 
 
-_item_ids_counter = count(1)
-_cart_ids_counter = count(1)
-_id_to_item: dict[int, Item] = {}
-_id_to_cart: dict[int, Cart] = {}
-
-
-def add_item(name: str, price: float) -> Item:
-    item = Item(id=next(_item_ids_counter), name=name, price=price)
-    _id_to_item[item.id] = item
+async def add_item(session: AsyncSession, name: str, price: float) -> Item:
+    item = Item(name=name, price=price)
+    session.add(item)
+    await session.commit()
     return item
 
 
-def get_item(id: int) -> Item | None:
-    return _id_to_item.get(id)
+async def get_item(session: AsyncSession, id: int) -> Item | None:
+    return await session.get(Item, id)
 
 
-def get_items(
+async def get_items(
+    session: AsyncSession,
     offset: int,
     limit: int,
     min_price: float | None,
     max_price: float | None,
     show_deleted: bool,
 ) -> list[Item]:
-    result = [
-        item
-        for item in _id_to_item.values()
-        if (show_deleted or not item.deleted)
-        and (min_price is None or item.price >= min_price)
-        and (max_price is None or item.price <= max_price)
-    ]
-    return result[offset : offset + limit]
+    query = select(Item).order_by(Item.id)
+
+    if not show_deleted:
+        query = query.where(Item.deleted.is_(False))
+
+    if min_price is not None:
+        query = query.where(Item.price >= min_price)
+
+    if max_price is not None:
+        query = query.where(Item.price <= max_price)
+
+    items = await session.scalars(query.offset(offset).limit(limit))
+    return list(items)
 
 
-def update_item(id: int, name: str, price: float) -> Item | None:
-    item = _id_to_item.get(id)
+async def update_item(
+    session: AsyncSession,
+    id: int,
+    name: str,
+    price: float,
+) -> Item | None:
+    item = await session.get(Item, id)
+
     if item is None or item.deleted:
         return None
+
     item.name = name
     item.price = price
+    await session.commit()
+
     return item
 
 
-def patch_item(id: int, name: str | None, price: float | None) -> Item | None:
-    item = _id_to_item.get(id)
+async def patch_item(
+    session: AsyncSession,
+    id: int,
+    name: str | None,
+    price: float | None,
+) -> Item | None:
+    item = await session.get(Item, id)
+
     if item is None or item.deleted:
         return None
+
     if name is not None:
         item.name = name
+
     if price is not None:
         item.price = price
+
+    await session.commit()
+
     return item
 
 
-def delete_item(id: int) -> None:
-    item = _id_to_item.get(id)
-    if item is not None:
+async def delete_item(session: AsyncSession, id: int) -> None:
+    item = await session.get(Item, id)
+
+    if item is not None and not item.deleted:
         item.deleted = True
+        await session.commit()
 
 
-def add_cart() -> Cart:
-    cart = Cart(id=next(_cart_ids_counter))
-    _id_to_cart[cart.id] = cart
+async def add_cart(session: AsyncSession) -> Cart:
+    cart = Cart()
+    session.add(cart)
+    await session.commit()
     return cart
 
 
-def get_cart(id: int) -> Cart | None:
-    return _id_to_cart.get(id)
+def _cart_totals() -> Subquery:
+    return (
+        select(
+            CartItem.cart_id.label("cart_id"),
+            func.sum(CartItem.quantity).label("quantity"),
+            func.sum(
+                case(
+                    (Item.deleted.is_(False), CartItem.quantity * Item.price),
+                    else_=0.0,
+                )
+            ).label("price"),
+        )
+        .join(Item, Item.id == CartItem.item_id)
+        .group_by(CartItem.cart_id)
+        .subquery()
+    )
 
 
-def get_carts(
+def _select_carts_with_price(totals: Subquery) -> Select:
+    return (
+        select(Cart, func.coalesce(totals.c.price, 0.0))
+        .outerjoin(totals, totals.c.cart_id == Cart.id)
+        .options(selectinload(Cart.items).joinedload(CartItem.item))
+        .execution_options(populate_existing=True)
+    )
+
+
+async def get_cart(session: AsyncSession, id: int) -> CartWithPrice | None:
+    totals = _cart_totals()
+    query = _select_carts_with_price(totals).where(Cart.id == id)
+
+    row = (await session.execute(query)).one_or_none()
+
+    if row is None:
+        return None
+
+    cart, price = row
+    return CartWithPrice(cart=cart, price=price)
+
+
+async def get_carts(
+    session: AsyncSession,
     offset: int,
     limit: int,
     min_price: float | None,
     max_price: float | None,
     min_quantity: int | None,
     max_quantity: int | None,
-) -> list[Cart]:
-    result = [
-        cart
-        for cart in _id_to_cart.values()
-        if (min_price is None or cart_price(cart) >= min_price)
-        and (max_price is None or cart_price(cart) <= max_price)
-        and (min_quantity is None or cart_quantity(cart) >= min_quantity)
-        and (max_quantity is None or cart_quantity(cart) <= max_quantity)
-    ]
-    return result[offset : offset + limit]
+) -> list[CartWithPrice]:
+    totals = _cart_totals()
+    total_price = func.coalesce(totals.c.price, 0.0)
+    total_quantity = func.coalesce(totals.c.quantity, 0)
+
+    query = _select_carts_with_price(totals).order_by(Cart.id)
+
+    if min_price is not None:
+        query = query.where(total_price >= min_price)
+
+    if max_price is not None:
+        query = query.where(total_price <= max_price)
+
+    if min_quantity is not None:
+        query = query.where(total_quantity >= min_quantity)
+
+    if max_quantity is not None:
+        query = query.where(total_quantity <= max_quantity)
+
+    rows = (await session.execute(query.offset(offset).limit(limit))).all()
+    return [CartWithPrice(cart=cart, price=price) for cart, price in rows]
 
 
-def add_item_to_cart(cart_id: int, item_id: int) -> Cart | None:
-    cart = _id_to_cart.get(cart_id)
-    item = _id_to_item.get(item_id)
+async def add_item_to_cart(
+    session: AsyncSession,
+    cart_id: int,
+    item_id: int,
+) -> CartWithPrice | None:
+    cart = await session.get(Cart, cart_id)
+    item = await session.get(Item, item_id)
+
     if cart is None or item is None or item.deleted:
         return None
-    cart.item_id_to_count[item_id] = cart.item_id_to_count.get(item_id, 0) + 1
-    return cart
 
+    cart_item = await session.get(CartItem, (cart_id, item_id))
 
-def cart_price(cart: Cart) -> float:
-    return sum(
-        _id_to_item[item_id].price * quantity
-        for item_id, quantity in cart.item_id_to_count.items()
-        if not _id_to_item[item_id].deleted
-    )
+    if cart_item is None:
+        session.add(CartItem(cart_id=cart_id, item_id=item_id, quantity=1))
+    else:
+        cart_item.quantity += 1
 
+    await session.commit()
 
-def cart_quantity(cart: Cart) -> int:
-    return sum(cart.item_id_to_count.values())
+    return await get_cart(session, cart_id)
