@@ -1,0 +1,9 @@
+MySQL 8.4.11
+dirty read / READ UNCOMMITTED: during uncommitted UPDATE = 99, after ROLLBACK = 10
+dirty read / READ COMMITTED: during uncommitted UPDATE = 10, after ROLLBACK = 10
+non-repeatable read / READ COMMITTED: 10 -> 99; new transaction = 99
+non-repeatable read / REPEATABLE READ: 10 -> 10; new transaction = 99
+phantom read / READ COMMITTED: 1 -> 2; INSERT committed; new transaction = 2
+phantom read / REPEATABLE READ: 1 -> 1; INSERT committed; new transaction = 2
+phantom read / SERIALIZABLE: 1 -> 1; INSERT blocked by range lock; new transaction = 2
+All selected experiments passed.
