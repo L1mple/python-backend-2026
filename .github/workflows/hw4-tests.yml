@@ -1,0 +1,35 @@
+name: HW4 Tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths: ['hw4/**', 'hw2/hw/**', '.github/workflows/hw4-tests.yml']
+  push:
+    branches: [hw4]
+    paths: ['hw4/**', 'hw2/hw/**', '.github/workflows/hw4-tests.yml']
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: shop
+          POSTGRES_PASSWORD: shop
+          POSTGRES_DB: shop
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U shop -d shop"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      DATABASE_URL: postgresql+psycopg://shop:shop@127.0.0.1:5432/shop
+      PYTHONPATH: hw2/hw
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install -r hw2/hw/requirements.txt
+      - run: python -m pytest hw2/hw/test_homework2.py hw4 -v
+      - run: python hw4/transactions.py
