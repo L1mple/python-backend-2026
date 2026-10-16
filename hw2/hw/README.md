@@ -121,3 +121,17 @@ export PYTHONPATH=${PWD}/hw2/hw
 начале в следующем виде: `{username} :: {message}`.
 
 Если делаете его, напишите, пожалуйста, прямо в PR-e об этом. Мне будет сильно проще это заметить<3
+
+## Мониторинг
+
+Для запуска приложения вместе с Prometheus и Grafana из каталога `hw2/hw`:
+
+```sh
+docker compose up --build
+```
+
+FastAPI экспортирует метрики на [localhost:8000/metrics](http://localhost:8000/metrics).
+Prometheus доступен на [localhost:9090](http://localhost:9090), Grafana — на
+[localhost:3000](http://localhost:3000). В Grafana используется локальная
+учетная запись `admin` / `admin`; перед запуском можно задать свой пароль через
+переменную `GRAFANA_ADMIN_PASSWORD`.
