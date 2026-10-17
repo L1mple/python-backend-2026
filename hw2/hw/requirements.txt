@@ -8,3 +8,5 @@ pytest-asyncio>=0.21.0
 httpx>=0.27.2
 Faker>=37.8.0
 prometheus-client
+SQLAlchemy==2.0.25
+psycopg2-binary==2.9.9
