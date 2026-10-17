@@ -1,0 +1,16 @@
+
+===== postgres =====
+[READ UNCOMMITTED] dirty read: аномалии нет. T1 записал 0 и откатил; T2 прочитал 100 (в БД на самом деле 100)
+[READ COMMITTED  ] dirty read: аномалии нет. T1 записал 0 и откатил; T2 прочитал 100 (в БД на самом деле 100)
+[READ COMMITTED  ] non-repeatable read: АНОМАЛИЯ ЕСТЬ. T1 прочитал 100, T2 закоммитил 500, T1 прочитал снова 500
+[REPEATABLE READ ] non-repeatable read: аномалии нет. T1 прочитал 100, T2 закоммитил 500, T1 прочитал снова 100
+[REPEATABLE READ ] phantom read: аномалии нет. count до=2, обычный SELECT после вставки T2=2, UPDATE затронул 2 строк, count после UPDATE=2
+[SERIALIZABLE    ] phantom read: аномалии нет. count до=2, обычный SELECT после вставки T2=2, UPDATE затронул 2 строк, count после UPDATE=2
+
+===== mysql =====
+[READ UNCOMMITTED] dirty read: АНОМАЛИЯ ЕСТЬ. T1 записал 0 и откатил; T2 прочитал 0 (в БД на самом деле 100)
+[READ COMMITTED  ] dirty read: аномалии нет. T1 записал 0 и откатил; T2 прочитал 100 (в БД на самом деле 100)
+[READ COMMITTED  ] non-repeatable read: АНОМАЛИЯ ЕСТЬ. T1 прочитал 100, T2 закоммитил 500, T1 прочитал снова 500
+[REPEATABLE READ ] non-repeatable read: аномалии нет. T1 прочитал 100, T2 закоммитил 500, T1 прочитал снова 100
+[REPEATABLE READ ] phantom read: АНОМАЛИЯ ЕСТЬ. count до=2, обычный SELECT после вставки T2=2, UPDATE затронул 3 строк, count после UPDATE=3
+[SERIALIZABLE    ] phantom read: аномалии нет. T1 читал count=2; INSERT в T2 заблокирован (lock timeout) -> строка не появилась
