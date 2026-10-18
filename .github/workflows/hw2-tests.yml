@@ -15,7 +15,22 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.13", "3.14"]
-    
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: shop
+          POSTGRES_USER: shop
+          POSTGRES_PASSWORD: shop
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U shop -d shop"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -35,5 +50,6 @@ jobs:
       working-directory: hw2/hw
       env:
         PYTHONPATH: ${{ github.workspace }}/hw2/hw
+        DATABASE_URL: postgresql+psycopg://shop:shop@localhost:5432/shop
       run: |
-        pytest test_homework2.py -v
+        pytest -v

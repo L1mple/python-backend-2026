@@ -2,6 +2,13 @@
 fastapi>=0.117.1
 uvicorn>=0.24.0
 
+# База данных
+sqlalchemy>=2.0.30
+psycopg[binary]>=3.2
+
+# Зависимости для отслеживания метрик
+prometheus-fastapi-instrumentator>=7.0.0
+
 # Зависимости для тестирования
 pytest>=7.4.0
 pytest-asyncio>=0.21.0
