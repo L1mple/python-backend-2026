@@ -4,14 +4,30 @@ name: "HW2 Tests"
 on:
   pull_request:
     branches: [ main ]
-    paths: [ 'hw2/hw/**' ]
+    paths: [ 'hw2/**', '.github/workflows/hw2-tests.yml' ]
   push:
     branches: [ main ]
-    paths: [ 'hw2/hw/**' ]
+    paths: [ 'hw2/**', '.github/workflows/hw2-tests.yml' ]
 
 jobs:
   test-hw2:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: shop
+          POSTGRES_PASSWORD: shop
+          POSTGRES_DB: shop
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U shop -d shop"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://shop:shop@localhost:5432/shop
     strategy:
       matrix:
         python-version: ["3.13", "3.14"]
@@ -36,4 +52,5 @@ jobs:
       env:
         PYTHONPATH: ${{ github.workspace }}/hw2/hw
       run: |
-        pytest test_homework2.py -v
+        python -m pytest -v
+        python ../scripts/isolation_demo.py
