@@ -18,7 +18,7 @@ def existing_empty_cart_id() -> int:
 
 
 @pytest.fixture(scope="session")
-def existing_items() -> list[int]:
+def existing_items(test_database) -> list[int]:
     items = [
         {
             "name": f"Тестовый товар {i}",
