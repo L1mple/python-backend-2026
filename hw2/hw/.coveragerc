@@ -1,0 +1,14 @@
+[run]
+source = shop_api
+omit =
+    shop_api/__init__.py
+    shop_api/models.py
+    shop_api/main.py
+    shop_api/transaction_demo.py
+    shop_api/api/__init__.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
+    raise NotImplementedError
