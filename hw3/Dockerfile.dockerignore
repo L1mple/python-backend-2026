@@ -1,0 +1,8 @@
+**
+!hw2/
+!hw2/hw/
+!hw2/hw/shop_api/
+!hw2/hw/shop_api/*.py
+!hw3/
+!hw3/requirements.txt
+!hw3/monitored_app.py
