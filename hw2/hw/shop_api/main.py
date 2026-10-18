@@ -1,10 +1,17 @@
 from http import HTTPStatus
 from typing import Annotated
 
-from fastapi import FastAPI, HTTPException, Query, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from pydantic import BaseModel, ConfigDict, Field
 
-app = FastAPI(title="Shop API")
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.orm import Session
+
+from .database import Cart, CartItem, Item, get_session, lifespan
+
+app = FastAPI(title="Shop API", lifespan=lifespan)
+SessionDep = Annotated[Session, Depends(get_session)]
 
 
 class ItemCreate(BaseModel):
@@ -28,46 +35,37 @@ class ItemPatch(BaseModel):
     price: float | None = Field(default=None, ge=0)
 
 
-items: dict[int, dict] = {}
-carts: dict[int, dict[int, int]] = {}
-
-next_item_id = 1
-next_cart_id = 1
-
-
-def item_view(item_id: int) -> dict:
-    item = items[item_id]
-
+def item_view(item: Item) -> dict:
     return {
-        "id": item_id,
-        "name": item["name"],
-        "price": item["price"],
-        "deleted": item["deleted"],
+        "id": item.id,
+        "name": item.name,
+        "price": item.price,
+        "deleted": item.deleted,
     }
 
 
-def cart_view(cart_id: int) -> dict:
-    cart = carts[cart_id]
-
+def cart_view(cart_id: int, session: Session) -> dict:
     cart_items = []
     total_price = 0.0
 
-    for item_id, quantity in cart.items():
-        item = items[item_id]
-
-        available = not item["deleted"]
+    rows = session.execute(
+        select(Item, CartItem.quantity).join(CartItem, CartItem.item_id == Item.id)
+        .where(CartItem.cart_id == cart_id).order_by(Item.id)
+    )
+    for item, quantity in rows:
+        available = not item.deleted
 
         cart_items.append(
             {
-                "id": item_id,
-                "name": item["name"],
+                "id": item.id,
+                "name": item.name,
                 "quantity": quantity,
                 "available": available,
             }
         )
 
         if available:
-            total_price += item["price"] * quantity
+            total_price += item.price * quantity
 
     return {
         "id": cart_id,
@@ -77,29 +75,26 @@ def cart_view(cart_id: int) -> dict:
 
 
 @app.post("/cart", status_code=HTTPStatus.CREATED)
-def create_cart(response: Response) -> dict[str, int]:
-    global next_cart_id
+def create_cart(response: Response, session: SessionDep) -> dict[str, int]:
+    cart = Cart()
+    session.add(cart)
+    session.flush()
+    response.headers["Location"] = f"/cart/{cart.id}"
 
-    cart_id = next_cart_id
-    next_cart_id += 1
-
-    carts[cart_id] = {}
-
-    response.headers["Location"] = f"/cart/{cart_id}"
-
-    return {"id": cart_id}
+    return {"id": cart.id}
 
 
 @app.get("/cart/{cart_id}")
-def get_cart(cart_id: int) -> dict:
-    if cart_id not in carts:
+def get_cart(cart_id: int, session: SessionDep) -> dict:
+    if session.get(Cart, cart_id) is None:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND)
 
-    return cart_view(cart_id)
+    return cart_view(cart_id, session)
 
 
 @app.get("/cart")
 def get_carts(
+    session: SessionDep,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(gt=0)] = 10,
     min_price: Annotated[float | None, Query(ge=0)] = None,
@@ -109,8 +104,8 @@ def get_carts(
 ) -> list[dict]:
     result = []
 
-    for cart_id in carts:
-        cart = cart_view(cart_id)
+    for cart_id in session.scalars(select(Cart.id).order_by(Cart.id)):
+        cart = cart_view(cart_id, session)
 
         quantity = sum(
             item["quantity"]
@@ -135,108 +130,110 @@ def get_carts(
 
 
 @app.post("/cart/{cart_id}/add/{item_id}")
-def add_item_to_cart(cart_id: int, item_id: int) -> dict:
-    if cart_id not in carts:
+def add_item_to_cart(cart_id: int, item_id: int, session: SessionDep) -> dict:
+    cart = session.scalar(select(Cart).where(Cart.id == cart_id).with_for_update())
+    if cart is None:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND)
 
-    if item_id not in items or items[item_id]["deleted"]:
+    item = session.scalar(select(Item).where(Item.id == item_id).with_for_update())
+    if item is None or item.deleted:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND)
 
-    cart = carts[cart_id]
-
-    cart[item_id] = cart.get(item_id, 0) + 1
-
-    return cart_view(cart_id)
+    statement = insert(CartItem).values(cart_id=cart_id, item_id=item_id, quantity=1)
+    session.execute(statement.on_conflict_do_update(
+        index_elements=[CartItem.cart_id, CartItem.item_id],
+        set_={"quantity": CartItem.quantity + 1},
+    ))
+    return cart_view(cart_id, session)
 
 
 @app.post("/item", status_code=HTTPStatus.CREATED)
-def create_item(body: ItemCreate, response: Response) -> dict:
-    global next_item_id
+def create_item(body: ItemCreate, response: Response, session: SessionDep) -> dict:
+    item = Item(name=body.name, price=body.price)
+    session.add(item)
+    session.flush()
+    response.headers["Location"] = f"/item/{item.id}"
 
-    item_id = next_item_id
-    next_item_id += 1
-
-    items[item_id] = {
-        "name": body.name,
-        "price": body.price,
-        "deleted": False,
-    }
-
-    response.headers["Location"] = f"/item/{item_id}"
-
-    return item_view(item_id)
+    return item_view(item)
 
 
 @app.get("/item/{item_id}")
-def get_item(item_id: int) -> dict:
-    if item_id not in items or items[item_id]["deleted"]:
+def get_item(item_id: int, session: SessionDep) -> dict:
+    item = session.get(Item, item_id)
+
+    if item is None or item.deleted:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND)
 
-    return item_view(item_id)
+    return item_view(item)
 
 
 @app.get("/item")
 def get_items(
+    session: SessionDep,
     offset: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(gt=0)] = 10,
     min_price: Annotated[float | None, Query(ge=0)] = None,
     max_price: Annotated[float | None, Query(ge=0)] = None,
     show_deleted: bool = False,
 ) -> list[dict]:
-    result = []
+    query = select(Item).order_by(Item.id)
 
-    for item_id, item in items.items():
-        if item["deleted"] and not show_deleted:
-            continue
+    if not show_deleted:
+        query = query.where(Item.deleted.is_(False))
 
-        if min_price is not None and item["price"] < min_price:
-            continue
+    if min_price is not None:
+        query = query.where(Item.price >= min_price)
 
-        if max_price is not None and item["price"] > max_price:
-            continue
+    if max_price is not None:
+        query = query.where(Item.price <= max_price)
 
-        result.append(item_view(item_id))
-
-    return result[offset : offset + limit]
+    return [item_view(item) for item in session.scalars(query.offset(offset).limit(limit))]
 
 
 @app.put("/item/{item_id}")
-def replace_item(item_id: int, body: ItemReplace):
-    if item_id not in items:
+def replace_item(item_id: int, body: ItemReplace, session: SessionDep):
+    item = session.scalar(select(Item).where(Item.id == item_id).with_for_update())
+
+    if item is None:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND)
 
-    if items[item_id]["deleted"]:
+    if item.deleted:
         return Response(status_code=HTTPStatus.NOT_MODIFIED)
+    item.name = body.name
+    item.price = body.price
+    session.flush()
 
-    items[item_id] = {
-        "name": body.name,
-        "price": body.price,
-        "deleted": False,
-    }
-
-    return item_view(item_id)
+    return item_view(item)
 
 
 @app.patch("/item/{item_id}")
-def patch_item(item_id: int, body: ItemPatch):
-    if item_id not in items:
+def patch_item(item_id: int, body: ItemPatch, session: SessionDep):
+    item = session.scalar(select(Item).where(Item.id == item_id).with_for_update())
+
+    if item is None:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND)
 
-    if items[item_id]["deleted"]:
+    if item.deleted:
         return Response(status_code=HTTPStatus.NOT_MODIFIED)
 
     changes = body.model_dump(exclude_unset=True)
+    if any(value is None for value in changes.values()):
+        raise HTTPException(status_code=HTTPStatus.UNPROCESSABLE_ENTITY, detail="Fields cannot be null")
 
-    items[item_id].update(changes)
+    for key, value in changes.items():
+        setattr(item, key, value)
+    session.flush()
 
-    return item_view(item_id)
+    return item_view(item)
 
 
 @app.delete("/item/{item_id}")
-def delete_item(item_id: int) -> dict:
-    if item_id not in items:
+def delete_item(item_id: int, session: SessionDep) -> dict:
+    item = session.scalar(select(Item).where(Item.id == item_id).with_for_update())
+
+    if item is None:
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND)
+    item.deleted = True
+    session.flush()
 
-    items[item_id]["deleted"] = True
-
-    return item_view(item_id)
+    return item_view(item)
