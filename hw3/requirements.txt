@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+prometheus-fastapi-instrumentator
+sqlalchemy[asyncio]
+asyncpg
+psycopg[binary]
+alembic

@@ -1,0 +1,43 @@
+=== dirty_read_attempt.py ===
+
+--- isolation = READ_COMMITTED ---
+T1: UPDATE value = 200 (no COMMIT)
+T2: read value = 100
+>>> DIRTY READ NOT reproduced (T2 sees old value 100)
+    PostgreSQL does not support true READ UNCOMMITTED -
+    it is emulated as READ COMMITTED, so dirty read is impossible.
+
+--- isolation = READ_COMMITTED ---
+T1: UPDATE value = 200 (no COMMIT)
+T2: read value = 100
+>>> DIRTY READ NOT reproduced (T2 sees old value 100)
+    PostgreSQL does not support true READ UNCOMMITTED -
+    it is emulated as READ COMMITTED, so dirty read is impossible.
+
+=== non_repeatable_read.py ===
+
+--- isolation = READ_COMMITTED ---
+T1: first read value = 100
+T2: UPDATE value = 200 and COMMIT
+T1: second read value = 200
+>>> NON-REPEATABLE READ reproduced (values differ)
+
+--- isolation = REPEATABLE_READ ---
+T1: first read value = 100
+T2: UPDATE value = 200 and COMMIT
+T1: second read value = 100
+>>> non-repeatable read is GONE (values are the same)
+
+=== phantom_read.py ===
+
+--- isolation = REPEATABLE_READ ---
+T1: first read count = 2
+T2: INSERT value = 30 and COMMIT
+T1: second read count = 2
+>>> phantom read is GONE (counts are the same)
+
+--- isolation = SERIALIZABLE ---
+T1: first read count = 2
+T2: INSERT value = 30 and COMMIT
+T1: second read count = 2
+>>> phantom read is GONE (counts are the same)
