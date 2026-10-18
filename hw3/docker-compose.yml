@@ -1,0 +1,47 @@
+services:
+  shop-api:
+    build:
+      context: ..
+      dockerfile: hw3/Dockerfile
+    environment:
+      DATABASE_HOST: database
+      DATABASE_PORT: 1433
+      DATABASE_USER: sa
+      DATABASE_PASSWORD: ${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD before starting Compose}
+      DATABASE_NAME: master
+    depends_on:
+      database:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  database:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: Y
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD before starting Compose}
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -Q "SELECT 1"
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    volumes:
+      - ./settings/prometheus:/etc/prometheus:ro
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    environment:
+      NO_PROXY: prometheus,localhost,127.0.0.1
+      no_proxy: prometheus,localhost,127.0.0.1
+    ports:
+      - "3000:3000"
+
+volumes:
+  sqlserver-data:
