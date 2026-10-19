@@ -132,3 +132,7 @@ dmypy.json
 
 # macOS
 .DS_Store
+
+# Локальная база магазина
+shop.db*
+coverage.json

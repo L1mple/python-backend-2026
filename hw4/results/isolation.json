@@ -1,0 +1,77 @@
+{
+  "postgresql_version": "17.11 (Debian 17.11-1.pgdg13+2)",
+  "results": [
+    {
+      "scenario": "dirty_read",
+      "isolation": "READ UNCOMMITTED",
+      "before": 100,
+      "after": 100,
+      "anomaly": false,
+      "sqlstate": null
+    },
+    {
+      "scenario": "dirty_read",
+      "isolation": "READ COMMITTED",
+      "before": 100,
+      "after": 100,
+      "anomaly": false,
+      "sqlstate": null
+    },
+    {
+      "scenario": "non_repeatable_read",
+      "isolation": "READ COMMITTED",
+      "before": 100,
+      "after": 200,
+      "anomaly": true,
+      "sqlstate": null
+    },
+    {
+      "scenario": "non_repeatable_read",
+      "isolation": "REPEATABLE READ",
+      "before": 100,
+      "after": 100,
+      "anomaly": false,
+      "sqlstate": null
+    },
+    {
+      "scenario": "phantom_read",
+      "isolation": "READ COMMITTED",
+      "before": 2,
+      "after": 3,
+      "anomaly": true,
+      "sqlstate": null
+    },
+    {
+      "scenario": "phantom_read",
+      "isolation": "REPEATABLE READ",
+      "before": 2,
+      "after": 2,
+      "anomaly": false,
+      "sqlstate": null
+    },
+    {
+      "scenario": "phantom_read",
+      "isolation": "SERIALIZABLE",
+      "before": 2,
+      "after": 2,
+      "anomaly": false,
+      "sqlstate": null
+    },
+    {
+      "scenario": "write_skew",
+      "isolation": "REPEATABLE READ",
+      "before": 200,
+      "after": 0,
+      "anomaly": true,
+      "sqlstate": null
+    },
+    {
+      "scenario": "write_skew",
+      "isolation": "SERIALIZABLE",
+      "before": 200,
+      "after": 100,
+      "anomaly": false,
+      "sqlstate": "40001"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+name: korsnaike-hw5-tests
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: shop
+      POSTGRES_PASSWORD: shop
+      POSTGRES_DB: hw5_test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shop -d hw5_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  tests:
+    build:
+      context: ..
+      dockerfile: hw5/Dockerfile
+      args:
+        PYTHON_VERSION: ${HW5_PYTHON_VERSION:-3.13}
+    environment:
+      DATABASE_URL: ${HW5_DATABASE_URL:-postgresql+psycopg://shop:shop@postgres:5432/hw5_test}
+    depends_on:
+      postgres:
+        condition: service_healthy
