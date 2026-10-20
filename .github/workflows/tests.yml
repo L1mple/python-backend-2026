@@ -17,7 +17,7 @@ jobs:
       - run: pip install -r hw2/hw/requirements.txt
       - run: |
           cd hw2/hw
-          pytest test_homework2.py test_queries.py \
+          pytest test_homework2.py test_queries.py test_routes.py \
             --cov=shop_api \
             --cov-report=term-missing \
             --cov-fail-under=90 \
