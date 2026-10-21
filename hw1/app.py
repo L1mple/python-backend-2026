@@ -89,8 +89,12 @@ async def application(
         return
 
     if path == "/mean":
-        message = await receive()
-        body = message.get("body", b"")
+        body = b""
+        more_body = True
+        while more_body:
+            message = await receive()
+            body += message.get("body", b"")
+            more_body = message.get("more_body", False)
         try:
             numbers = json.loads(body)
         except ValueError:
