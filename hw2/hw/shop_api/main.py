@@ -2,7 +2,7 @@ from http import HTTPStatus
 from itertools import count
 
 from fastapi import FastAPI, HTTPException, Query, Response
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 app = FastAPI(title="Shop API")
 
@@ -16,20 +16,27 @@ cart_id_seq = count(1)
 class Item(BaseModel):
     id: int
     name: str
-    price: float
+    price: float = Field(ge=0)
     deleted: bool = False
 
 
 class ItemCreate(BaseModel):
     name: str
-    price: float
+    price: float = Field(ge=0)
 
 
 class ItemPatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str | None = None
-    price: float | None = None
+    price: float | None = Field(None, ge=0)
+
+    @field_validator("name", "price")
+    @classmethod
+    def not_null(cls, value):
+        if value is None:
+            raise ValueError("explicit null is not allowed")
+        return value
 
 
 class CartItem(BaseModel):
