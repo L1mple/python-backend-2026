@@ -1,44 +1,40 @@
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import random
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 import requests
-from faker import Faker
 
-faker = Faker()
+URL = "http://localhost:8080"
+WORKERS = 10
+DURATION = 60
 
-
-def create_users():
-    for _ in range(500):
-        user = faker.profile()
-        response = requests.post(
-            "http://localhost:8080/create-user",
-            json={
-                "username": user["username"],
-                "first_name": user["name"],
-                "last_name": "",
-            },
-        )
-
-        print(response)
+items = []
+carts = []
 
 
-def get_users():
-    for _ in range(500):
+def work(deadline):
+    s = requests.Session()
+    while time.time() < deadline:
+        action = random.choice(["item", "get_item", "list", "cart", "add", "bad"])
 
-        response = requests.post(
-            "http://localhost:8080/get-user",
-            params={"id": faker.random_number(digits=2)},
-        )
-        print(response)
+        if action == "item":
+            r = s.post(f"{URL}/item", json={"name": "x", "price": random.randint(1, 1000)})
+            items.append(r.json()["id"])
+        elif action == "get_item" and items:
+            s.get(f"{URL}/item/{random.choice(items)}")
+        elif action == "list":
+            s.get(f"{URL}/item", params={"limit": 50})
+            s.get(f"{URL}/cart", params={"limit": 50})
+        elif action == "cart":
+            r = s.post(f"{URL}/cart")
+            carts.append(r.json()["id"])
+        elif action == "add" and items and carts:
+            s.post(f"{URL}/cart/{random.choice(carts)}/add/{random.choice(items)}")
+        elif action == "bad":
+            s.get(f"{URL}/item/999999")
 
 
-with ThreadPoolExecutor() as executor:
-    futures = {}
-
-    for i in range(15):
-        futures[executor.submit(create_users)] = f"create-user-{i}"
-
-    for _ in range(15):
-        futures[executor.submit(get_users)] = f"get-users-{i}"
-
-    for future in as_completed(futures):
-        print(f"completed {futures[future]}")
+deadline = time.time() + DURATION
+with ThreadPoolExecutor(WORKERS) as ex:
+    for _ in range(WORKERS):
+        ex.submit(work, deadline)
