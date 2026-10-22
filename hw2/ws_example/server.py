@@ -1,46 +1,60 @@
 from dataclasses import dataclass, field
 from uuid import uuid4
 
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
 app = FastAPI()
 
 
 @dataclass(slots=True)
 class Broadcaster:
-    subscribers: list[WebSocket] = field(init=False, default_factory=list)
+    subscribers: list[WebSocket] = field(default_factory=list)
 
-    async def subscribe(self, ws: WebSocket) -> None:
-        await ws.accept()
+    def subscribe(self, ws: WebSocket) -> None:
         self.subscribers.append(ws)
 
-    async def unsubscribe(self, ws: WebSocket) -> None:
-        self.subscribers.remove(ws)
+    def unsubscribe(self, ws: WebSocket) -> None:
+        if ws in self.subscribers:
+            self.subscribers.remove(ws)
 
-    async def publish(self, message: str) -> None:
-        for ws in self.subscribers:
-            await ws.send_text(message)
-
-
-broadcaster = Broadcaster()
-
-
-@app.post("/publish")
-async def post_publish(request: Request):
-    message = (await request.body()).decode()
-    await broadcaster.publish(message)
+    async def publish(self, message: str, sender: WebSocket) -> None:
+        for ws in self.subscribers.copy():
+            if ws == sender:
+                continue
+            try:
+                await ws.send_text(message)
+            except (WebSocketDisconnect, OSError, RuntimeError) as e:
+                print(f"Error sending message: {e}")
+                self.unsubscribe(ws)
 
 
-@app.websocket("/subscribe")
-async def ws_subscribe(ws: WebSocket):
-    client_id = uuid4()
-    await broadcaster.subscribe(ws)
-    await broadcaster.publish(f"client {client_id} subscribed")
+rooms: dict[str, Broadcaster] = {}
 
+
+@app.websocket("/chat/{chat_name}")
+async def chat(ws: WebSocket, chat_name: str) -> None:
+    await ws.accept()
+
+    if chat_name not in rooms:
+        rooms[chat_name] = Broadcaster()
+    room = rooms[chat_name]
+    room.subscribe(ws)
+    print(f"Room {chat_name!r}, connections: {len(room.subscribers)}")
+    username = f"user_{uuid4().hex[:8]}"
+
+    print(f"[{chat_name}] {username} connected")
     try:
         while True:
             text = await ws.receive_text()
-            await broadcaster.publish(text)
+            if not text.strip():
+                continue
+
+            message = f"{username} :: {text}"
+            await room.publish(message, sender=ws)
     except WebSocketDisconnect:
-        broadcaster.unsubscribe(ws)
-        await broadcaster.publish(f"client {client_id} unsubscribed")
+        pass
+    finally:
+        room.unsubscribe(ws)
+        if not room.subscribers and rooms.get(chat_name) is room:
+            del rooms[chat_name]
+        print(f"[{chat_name}] {username} disconnected")
