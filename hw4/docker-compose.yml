@@ -1,0 +1,53 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: shop
+      POSTGRES_USER: shop
+      POSTGRES_PASSWORD: shop
+    ports:
+      - "7433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shop -d shop"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  postgres_test:
+    image: postgres:16
+    profiles: [test]
+    environment:
+      POSTGRES_DB: shop_test
+      POSTGRES_USER: shop
+      POSTGRES_PASSWORD: shop
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shop -d shop_test"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  tests:
+    image: python:3.13-slim
+    profiles: [test]
+    depends_on:
+      postgres_test:
+        condition: service_healthy
+    working_dir: /app
+    volumes:
+      - ..:/app:ro
+    environment:
+      SHOP_DATABASE_URL: postgresql://shop:shop@postgres_test:5432/shop_test
+      PYTHONPATH: /app/hw4
+      PYTHONDONTWRITEBYTECODE: "1"
+      COVERAGE_FILE: /tmp/.coverage
+    command: >-
+      sh -c "python -m pip install -q -r hw4/requirements.txt
+      && python -m pytest -q -p no:cacheprovider hw4/test_postgres.py
+      --cov=shop_api --cov-branch
+      --cov-report=term-missing --cov-fail-under=95
+      && python hw4/isolation_demo.py"
+
+volumes:
+  postgres_data:

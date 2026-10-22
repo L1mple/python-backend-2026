@@ -1,0 +1,47 @@
+name: HW4 PostgreSQL Tests
+
+on:
+  push:
+    paths:
+      - 'hw4/**'
+      - 'lecture4/README.md'
+      - '.github/workflows/hw4-postgres-tests.yml'
+  pull_request:
+    paths:
+      - 'hw4/**'
+      - 'lecture4/README.md'
+      - '.github/workflows/hw4-postgres-tests.yml'
+
+jobs:
+  test-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: shop
+          POSTGRES_USER: shop
+          POSTGRES_PASSWORD: shop
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U shop -d shop"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 15
+    env:
+      SHOP_DATABASE_URL: postgresql://shop:shop@localhost:5432/shop
+      PYTHONPATH: ${{ github.workspace }}/hw4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install dependencies
+        run: python -m pip install -r hw4/requirements.txt
+      - name: Test API and transaction isolation
+        run: |
+          python -m pytest -q hw4/test_postgres.py \
+            --cov=shop_api --cov-branch \
+            --cov-report=term-missing --cov-fail-under=95
+          python hw4/isolation_demo.py
