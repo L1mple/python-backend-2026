@@ -1,0 +1,94 @@
+syntax = "proto3";
+
+package shop;
+
+service Shop {
+    rpc CreateItem(CreateItemRequest) returns (Item);
+    rpc GetItem(IdRequest) returns (Item);
+    rpc GetItems(GetItemsRequest) returns (ItemList);
+    rpc ReplaceItem(ReplaceItemRequest) returns (Item);
+    rpc PatchItem(PatchItemRequest) returns (Item);
+    rpc DeleteItem(IdRequest) returns (Item);
+
+    rpc CreateCart(Empty) returns (IdResponse);
+    rpc GetCart(IdRequest) returns (Cart);
+    rpc GetCarts(GetCartsRequest) returns (CartList);
+    rpc AddItemToCart(AddItemRequest) returns (Cart);
+}
+
+message Empty {}
+
+message IdRequest {
+    int32 id = 1;
+}
+
+message IdResponse {
+    int32 id = 1;
+}
+
+message CreateItemRequest {
+    string name = 1;
+    double price = 2;
+}
+
+message ReplaceItemRequest {
+    int32 id = 1;
+    string name = 2;
+    double price = 3;
+}
+
+message PatchItemRequest {
+    int32 id = 1;
+    optional string name = 2;
+    optional double price = 3;
+}
+
+message GetItemsRequest {
+    int32 offset = 1;
+    int32 limit = 2;
+    optional double min_price = 3;
+    optional double max_price = 4;
+    bool show_deleted = 5;
+}
+
+message Item {
+    int32 id = 1;
+    string name = 2;
+    double price = 3;
+    bool deleted = 4;
+}
+
+message ItemList {
+    repeated Item items = 1;
+}
+
+message AddItemRequest {
+    int32 cart_id = 1;
+    int32 item_id = 2;
+}
+
+message GetCartsRequest {
+    int32 offset = 1;
+    int32 limit = 2;
+    optional double min_price = 3;
+    optional double max_price = 4;
+    optional int32 min_quantity = 5;
+    optional int32 max_quantity = 6;
+}
+
+message CartItem {
+    int32 id = 1;
+    string name = 2;
+    int32 quantity = 3;
+    bool available = 4;
+}
+
+message Cart {
+    int32 id = 1;
+    repeated CartItem items = 2;
+    double price = 3;
+}
+
+message CartList {
+    repeated Cart carts = 1;
+}
