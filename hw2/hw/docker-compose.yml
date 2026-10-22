@@ -1,0 +1,32 @@
+services:
+  shop:
+    build: .
+    ports:
+      - "127.0.0.1:8080:8080"
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.15.0
+    volumes:
+      - ./settings/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "127.0.0.1:9090:9090"
+    depends_on:
+      - shop
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:13.2.3
+    environment:
+      # Дашборды открываются без входа только на просмотр; admin/admin для правки
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/shop-http.json
+    volumes:
+      - ./settings/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./settings/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
