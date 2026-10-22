@@ -1,0 +1,46 @@
+{
+  "uid": "shop-api-latency",
+  "title": "Shop API Latency",
+  "tags": ["shop-api"],
+  "timezone": "browser",
+  "schemaVersion": 40,
+  "version": 1,
+  "refresh": "5s",
+  "time": {"from": "now-5m", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "title": "95th percentile latency, all API requests",
+      "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 0},
+      "fieldConfig": {"defaults": {"unit": "s", "min": 0}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_highr_seconds_bucket{job=\"shop-api\"}[5m])))",
+          "legendFormat": "Shop API p95"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Average latency by route",
+      "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 9},
+      "fieldConfig": {"defaults": {"unit": "s", "min": 0}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "expr": "sum by (handler, method) (rate(http_request_duration_seconds_sum{job=\"shop-api\",handler=~\"/(item|cart).*\"}[5m])) / clamp_min(sum by (handler, method) (rate(http_request_duration_seconds_count{job=\"shop-api\",handler=~\"/(item|cart).*\"}[5m])), 1e-9)",
+          "legendFormat": "{{method}} {{handler}}"
+        }
+      ]
+    }
+  ]
+}
