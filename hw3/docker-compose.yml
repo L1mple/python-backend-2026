@@ -1,0 +1,31 @@
+services:
+
+  local:
+    build:
+      # Контекст - корень репозитория, чтобы Dockerfile мог скопировать
+      # сервис из hw2/hw без дублирования кода.
+      context: ..
+      dockerfile: hw3/Dockerfile
+      target: local
+    restart: always
+    ports:
+      - 8080:8080
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - 3000:3000
+    restart: always
+
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - ./settings/prometheus/:/etc/prometheus/
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+    ports:
+      - 9090:9090
+    restart: always
