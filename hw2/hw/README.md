@@ -121,3 +121,25 @@ export PYTHONPATH=${PWD}/hw2/hw
 начале в следующем виде: `{username} :: {message}`.
 
 Если делаете его, напишите, пожалуйста, прямо в PR-e об этом. Мне будет сильно проще это заметить<3
+
+## Пункт 3 — демонстрации изоляции
+
+Скрипт создаёт временную схему `isolation_demo_<uuid>`.
+
+| Сценарий | Уровень | Ожидаемый результат PostgreSQL |
+| --- | --- | --- |
+| Чтение чужого UPDATE до rollback | READ UNCOMMITTED | 100, а не незакоммиченные 999 |
+| То же | READ COMMITTED | 100; dirty read отсутствует |
+| Два SELECT, между ними чужой UPDATE + commit | READ COMMITTED | 100 → 200: non-repeatable read |
+| То же | REPEATABLE READ / SERIALIZABLE | 100 → 100 |
+| Два COUNT, между ними чужой INSERT + commit | READ COMMITTED | 2 → 3: phantom read |
+| То же | REPEATABLE READ / SERIALIZABLE | 2 → 2: фантомов нет |
+| Две транзакции видят два положительных баланса и обнуляют каждая свой | REPEATABLE READ | Оба commit; положительных балансов 0 (write skew) |
+| То же | SERIALIZABLE | Одна транзакция отклонена с SQLSTATE 40001; после полного повтора остаётся 1 положительный баланс |
+
+PostgreSQL трактует READ UNCOMMITTED как READ COMMITTED, поэтому показать dirty read на этой БД невозможно. 
+REPEATABLE READ использует снимок и защищает даже от phantom reads. Различие с SERIALIZABLE показано
+через write skew: правило «хотя бы один баланс положителен» нарушается на
+REPEATABLE READ и сохраняется на SERIALIZABLE. При 40001 нужно повторять
+всю транзакцию, включая чтение и решение о записи; скрипт показывает этот повтор.
+
