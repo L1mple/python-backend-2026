@@ -1,0 +1,28 @@
+FROM python:3.12 AS base
+
+ARG PYTHONFAULTHANDLER=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONHASHSEED=random \
+    PIP_NO_CACHE_DIR=on \
+    PIP_DISABLE_PIP_VERSION_CHECK=on \
+    PIP_DEFAULT_TIMEOUT=500
+
+ENV PYTHONFAULTHANDLER=$PYTHONFAULTHANDLER \
+    PYTHONUNBUFFERED=$PYTHONUNBUFFERED \
+    PYTHONHASHSEED=$PYTHONHASHSEED \
+    PIP_NO_CACHE_DIR=$PIP_NO_CACHE_DIR \
+    PIP_DISABLE_PIP_VERSION_CHECK=$PIP_DISABLE_PIP_VERSION_CHECK \
+    PIP_DEFAULT_TIMEOUT=$PIP_DEFAULT_TIMEOUT
+
+RUN python -m pip install --upgrade pip
+
+WORKDIR /app
+
+COPY requirements.txt ./requirements.txt
+RUN pip install -r requirements.txt
+
+COPY shop_api ./shop_api
+
+FROM base AS local
+
+CMD ["uvicorn", "shop_api.main:app", "--port", "8080", "--host", "0.0.0.0"]
