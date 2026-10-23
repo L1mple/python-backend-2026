@@ -12,6 +12,21 @@ on:
 jobs:
   test-hw2:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: shop
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+        ports:
+          - 7432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d shop"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
     strategy:
       matrix:
         python-version: ["3.13", "3.14"]
@@ -35,5 +50,6 @@ jobs:
       working-directory: hw2/hw
       env:
         PYTHONPATH: ${{ github.workspace }}/hw2/hw
+        DATABASE_URL: postgresql://postgres:password@localhost:7432/shop
       run: |
-        pytest test_homework2.py -v
+        pytest test_homework2.py -v --cov=shop_api --cov-report=term-missing --cov-fail-under=90
