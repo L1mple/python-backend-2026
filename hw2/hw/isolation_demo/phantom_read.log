@@ -1,0 +1,25 @@
+--- repeatable read
+rows before: 1
+another transaction inserted a matching row and committed
+rows after: 1
+
+--- serializable
+rows before: 1
+another transaction inserted a matching row and committed
+rows after: 1
+
+--- repeatable read, concurrent inserts
+A counted: 0
+B counted: 0
+both inserted their row
+A committed
+B committed
+rows left: 2
+
+--- serializable, concurrent inserts
+A counted: 0
+B counted: 0
+both inserted their row
+A committed
+B rejected, sqlstate 40001
+rows left: 1

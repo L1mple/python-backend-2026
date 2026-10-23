@@ -4,18 +4,54 @@ name: "HW2 Tests"
 on:
   pull_request:
     branches: [ main ]
-    paths: [ 'hw2/hw/**' ]
+    paths:
+      - 'hw2/hw/**'
+      - '.github/workflows/hw2-tests.yml'
   push:
-    branches: [ main ]
-    paths: [ 'hw2/hw/**' ]
+    branches: [ main, hw5 ]
+    paths:
+      - 'hw2/hw/**'
+      - '.github/workflows/hw2-tests.yml'
 
 jobs:
   test-hw2:
+    name: "Tests (${{ matrix.database }}, py${{ matrix.python-version }})"
     runs-on: ubuntu-latest
+
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.13", "3.14"]
-    
+        database: [postgres, sqlite]
+        include:
+          - database: postgres
+            database-url: "postgresql+asyncpg://shop:shop@localhost:5432/shop"
+          - database: sqlite
+            database-url: "sqlite+aiosqlite:///./shop.db"
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: shop
+          POSTGRES_USER: shop
+          POSTGRES_PASSWORD: shop
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U shop -d shop"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    defaults:
+      run:
+        working-directory: hw2/hw
+
+    env:
+      DATABASE_URL: ${{ matrix.database-url }}
+      PYTHONPATH: ${{ github.workspace }}/hw2/hw
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -24,16 +60,22 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
-    
+        cache: pip
+        cache-dependency-path: hw2/hw/requirements.txt
+
     - name: Install dependencies
       working-directory: hw2/hw
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Run tests
-      working-directory: hw2/hw
-      env:
-        PYTHONPATH: ${{ github.workspace }}/hw2/hw
-      run: |
-        pytest test_homework2.py -v
+    - name: Run tests with coverage
+      run: pytest -v --cov --cov-report=term-missing --cov-report=xml
+
+    - name: Upload coverage report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-${{ matrix.database }}-py${{ matrix.python-version }}
+        path: hw2/hw/coverage.xml
+        if-no-files-found: warn

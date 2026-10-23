@@ -1,0 +1,13 @@
+--- read uncommitted
+price before: 100.0
+SHOW transaction_isolation: read uncommitted
+writer set 999.0, no commit
+reader sees: 100.0
+after writer rollback: 100.0
+
+--- read committed
+price before: 100.0
+SHOW transaction_isolation: read committed
+writer set 999.0, no commit
+reader sees: 100.0
+after writer rollback: 100.0
