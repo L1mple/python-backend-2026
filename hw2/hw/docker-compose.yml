@@ -1,0 +1,74 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: shop
+      POSTGRES_USER: shop
+      POSTGRES_PASSWORD: shop
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shop -d shop"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: always
+
+  local:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+      target: local
+    restart: always
+    environment:
+      LATENCY_EMULATION: "1"
+      DATABASE_URL: postgresql+psycopg://shop:shop@postgres:5432/shop
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8082:8080"
+
+  transaction-demos:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+      target: local
+    profiles: ["demo"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://shop:shop@postgres:5432/shop
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["python", "-m", "transactions.run_all"]
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./settings/grafana/provisioning:/etc/grafana/provisioning
+      - ./settings/grafana/dashboards:/var/lib/grafana/dashboards
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    depends_on:
+      - prometheus
+    restart: always
+
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - ./settings/prometheus/:/etc/prometheus/
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+    ports:
+      - "9090:9090"
+    restart: always
+
+volumes:
+  postgres_data:

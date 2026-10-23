@@ -1,39 +1,95 @@
-name: "HW2 Tests"
+name: "Store API CI"
 
-# Запускаем тесты при изменении файлов в hw2/hw/
 on:
   pull_request:
     branches: [ main ]
-    paths: [ 'hw2/hw/**' ]
+    paths:
+      - "hw2/hw/**"
+      - ".github/workflows/hw2-tests.yml"
   push:
-    branches: [ main ]
-    paths: [ 'hw2/hw/**' ]
+    paths:
+      - "hw2/hw/**"
+      - ".github/workflows/hw2-tests.yml"
 
 jobs:
-  test-hw2:
+  lint:
+    name: Ruff
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.13", "3.14"]
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-    
-    - name: Install dependencies
-      working-directory: hw2/hw
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+    defaults:
+      run:
+        working-directory: hw2/hw
 
-    - name: Run tests
-      working-directory: hw2/hw
-      env:
-        PYTHONPATH: ${{ github.workspace }}/hw2/hw
-      run: |
-        pytest test_homework2.py -v
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Ruff
+        run: python -m pip install ruff
+
+      - name: Run Ruff
+        run: ruff check shop_api transactions tests
+
+  unit-tests:
+    name: Tests and coverage
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: shop
+          POSTGRES_USER: shop
+          POSTGRES_PASSWORD: shop
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U shop -d shop"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: hw2/hw
+    env:
+      DATABASE_URL: postgresql+psycopg://shop:shop@localhost:5432/shop
+      PYTHONPATH: ${{ github.workspace }}/hw2/hw
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: hw2/hw/requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run tests with coverage
+        run: >-
+          pytest test_homework2.py tests
+          --cov=shop_api
+          --cov-report=term-missing
+          --cov-report=xml
+          --cov-fail-under=95
+
+  secret-scan:
+    name: Gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan repository for leaked secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
