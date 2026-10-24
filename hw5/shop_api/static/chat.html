@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Тест WebSocket-чата</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #172033;
+      background: #f2f5fa;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      padding: 32px 16px;
+      display: grid;
+      place-items: center;
+    }
+
+    main {
+      width: min(100%, 680px);
+      overflow: hidden;
+      border: 1px solid #dce3ee;
+      border-radius: 18px;
+      background: #fff;
+      box-shadow: 0 18px 50px rgb(26 42 75 / 10%);
+    }
+
+    header {
+      padding: 24px;
+      border-bottom: 1px solid #e8edf4;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.4rem;
+    }
+
+    .hint {
+      margin: 8px 0 0;
+      color: #667085;
+      line-height: 1.5;
+    }
+
+    .connection {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-top: 18px;
+      color: #667085;
+      font-size: 0.9rem;
+    }
+
+    .indicator {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #98a2b3;
+    }
+
+    .connection[data-connected="true"] {
+      color: #067647;
+    }
+
+    .connection[data-connected="true"] .indicator {
+      background: #12b76a;
+    }
+
+    .connection[data-error="true"] {
+      color: #b42318;
+    }
+
+    .connection[data-error="true"] .indicator {
+      background: #f04438;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 10px;
+      align-items: end;
+      padding: 20px 24px;
+      border-bottom: 1px solid #e8edf4;
+      background: #fbfcfe;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 7px;
+      color: #344054;
+      font-size: 0.88rem;
+      font-weight: 600;
+    }
+
+    input {
+      width: 100%;
+      min-height: 46px;
+      padding: 10px 12px;
+      border: 1px solid #cfd7e3;
+      border-radius: 9px;
+      font: inherit;
+    }
+
+    input:focus-visible,
+    button:focus-visible {
+      outline: 3px solid #84caff;
+      outline-offset: 2px;
+    }
+
+    button {
+      min-height: 46px;
+      padding: 0 16px;
+      border: 0;
+      border-radius: 9px;
+      background: #175cd3;
+      color: #fff;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      border: 1px solid #cfd7e3;
+      background: #fff;
+      color: #344054;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    .messages {
+      height: min(48vh, 380px);
+      min-height: 220px;
+      overflow-y: auto;
+      padding: 18px 24px;
+    }
+
+    .empty {
+      margin: 0;
+      color: #98a2b3;
+      text-align: center;
+      line-height: 180px;
+    }
+
+    .message {
+      width: fit-content;
+      max-width: 100%;
+      margin: 0 0 10px;
+      padding: 10px 13px;
+      overflow-wrap: anywhere;
+      border-radius: 12px 12px 12px 3px;
+      background: #f2f4f7;
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
+
+    .compose {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      padding: 18px 24px 24px;
+      border-top: 1px solid #e8edf4;
+    }
+
+    .compose label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    @media (max-width: 520px) {
+      body {
+        padding: 12px;
+      }
+
+      header,
+      .messages {
+        padding-inline: 18px;
+      }
+
+      .controls {
+        grid-template-columns: minmax(0, 1fr) auto;
+        padding-inline: 18px;
+      }
+
+      .controls input {
+        grid-column: 1 / -1;
+      }
+
+      .compose {
+        padding-inline: 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Тест WebSocket-чата</h1>
+      <p class="hint">Откройте страницу в двух вкладках и подключитесь к одной комнате, чтобы проверить обмен сообщениями.</p>
+      <div class="connection" id="connection-status" role="status" aria-live="polite">
+        <span class="indicator" aria-hidden="true"></span>
+        <span id="connection-label">Не подключено</span>
+      </div>
+    </header>
+
+    <form class="controls" id="join-form">
+      <div>
+        <label for="chat-name">Комната</label>
+        <input id="chat-name" name="chat_name" value="general" pattern="[A-Za-z0-9_-]+" maxlength="64" required>
+      </div>
+      <button type="submit" id="join-button">Подключиться</button>
+      <button class="secondary" type="button" id="disconnect-button" disabled>Отключиться</button>
+    </form>
+
+    <section class="messages" id="messages" role="log" aria-label="Сообщения чата" aria-live="polite" aria-relevant="additions">
+      <p class="empty" id="empty-state">Сообщений пока нет</p>
+    </section>
+
+    <form class="compose" id="message-form">
+      <label for="message-input">Сообщение</label>
+      <input id="message-input" name="message" maxlength="1000" autocomplete="off" placeholder="Введите сообщение…" required disabled>
+      <button type="submit" id="send-button" disabled>Отправить</button>
+    </form>
+  </main>
+
+  <script>
+    const joinForm = document.querySelector('#join-form');
+    const chatNameInput = document.querySelector('#chat-name');
+    const joinButton = document.querySelector('#join-button');
+    const disconnectButton = document.querySelector('#disconnect-button');
+    const connectionStatus = document.querySelector('#connection-status');
+    const connectionLabel = document.querySelector('#connection-label');
+    const messages = document.querySelector('#messages');
+    const emptyState = document.querySelector('#empty-state');
+    const messageForm = document.querySelector('#message-form');
+    const messageInput = document.querySelector('#message-input');
+    const sendButton = document.querySelector('#send-button');
+    let socket = null;
+
+    function updateConnection(label, connected = false, error = false) {
+      connectionLabel.textContent = label;
+      connectionStatus.dataset.connected = String(connected);
+      connectionStatus.dataset.error = String(error);
+      messageInput.disabled = !connected;
+      sendButton.disabled = !connected;
+      disconnectButton.disabled = !connected;
+      joinButton.disabled = connected || socket?.readyState === WebSocket.CONNECTING;
+    }
+
+    joinForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      if (!joinForm.reportValidity()) return;
+
+      if (socket && socket.readyState < WebSocket.CLOSING) {
+        socket.close();
+      }
+
+      messages.replaceChildren(emptyState);
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const chatName = encodeURIComponent(chatNameInput.value.trim());
+      const nextSocket = new WebSocket(`${protocol}//${location.host}/chat/${chatName}`);
+      socket = nextSocket;
+      joinButton.disabled = true;
+      updateConnection('Подключение…');
+
+      nextSocket.addEventListener('open', () => {
+        if (socket === nextSocket) updateConnection(`Подключено к «${chatNameInput.value.trim()}»`, true);
+      });
+
+      nextSocket.addEventListener('message', (event) => {
+        if (socket !== nextSocket) return;
+        const message = document.createElement('p');
+        message.className = 'message';
+        message.textContent = event.data;
+        emptyState.remove();
+        messages.append(message);
+        messages.scrollTop = messages.scrollHeight;
+      });
+
+      nextSocket.addEventListener('error', () => {
+        if (socket === nextSocket) updateConnection('Ошибка WebSocket', false, true);
+      });
+
+      nextSocket.addEventListener('close', () => {
+        if (socket === nextSocket) updateConnection('Соединение закрыто');
+      });
+    });
+
+    disconnectButton.addEventListener('click', () => {
+      if (socket && socket.readyState < WebSocket.CLOSING) socket.close();
+      updateConnection('Отключение…');
+    });
+
+    messageForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const message = messageInput.value.trim();
+      if (!message || !socket || socket.readyState !== WebSocket.OPEN) return;
+      socket.send(message);
+      messageInput.value = '';
+      messageInput.focus();
+    });
+  </script>
+</body>
+</html>

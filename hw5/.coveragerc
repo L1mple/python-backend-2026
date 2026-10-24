@@ -1,0 +1,8 @@
+[run]
+source = shop_api
+branch = true
+# SQLAlchemy asyncio выполняет запросы внутри greenlet, без этого coverage теряет строки после await.
+concurrency = thread,greenlet
+
+[report]
+show_missing = true

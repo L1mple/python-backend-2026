@@ -1,0 +1,10 @@
+.git
+.pytest_cache
+.venv
+__pycache__
+**/__pycache__
+**/*.py[cod]
+tests
+.coverage
+.coveragerc
+pytest.ini
