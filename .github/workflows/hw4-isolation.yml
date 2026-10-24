@@ -1,0 +1,44 @@
+name: HW4 H2 isolation lab
+
+on:
+  pull_request:
+    branches: [main, hw2, hw3]
+    paths: ['hw4/isolation/**', '.github/workflows/hw4-isolation.yml']
+  push:
+    branches: [main, hw2, hw3, h2-lab]
+    paths: ['hw4/isolation/**', '.github/workflows/hw4-isolation.yml']
+
+jobs:
+  isolation:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.13', '3.14']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Build Python / JDBC / H2 2.5.252 runner
+        run: docker build --build-arg PYTHON_VERSION='${{ matrix.python-version }}' -t h2-isolation hw4/isolation
+      - name: Check worker failure and rollback
+        run: docker run --rm --entrypoint python h2-isolation -m unittest -v test_runner
+      - name: Run six assertions three times
+        run: |
+          mkdir -p "$RUNNER_TEMP/h2-results"
+          for run in 1 2 3; do
+            docker run --rm -v "$RUNNER_TEMP/h2-results:/output" h2-isolation "/output/run-$run.jsonl"
+          done
+      - name: Check journals and render six timelines
+        working-directory: hw4/isolation
+        run: |
+          uv venv --python '${{ matrix.python-version }}'
+          uv pip install -r requirements.txt
+          uv run --no-project python -m unittest -v
+          for run in 1 2 3; do
+            uv run --no-project python visualize.py "$RUNNER_TEMP/h2-results/run-$run.jsonl" "$RUNNER_TEMP/h2-results/run-$run.png"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: h2-isolation-python-${{ matrix.python-version }}
+          path: ${{ runner.temp }}/h2-results/
