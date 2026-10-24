@@ -1,0 +1,3 @@
+[run]
+source = shop_api
+concurrency = greenlet, thread
