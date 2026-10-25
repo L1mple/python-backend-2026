@@ -8,6 +8,9 @@ from fastapi.testclient import TestClient
 
 from shop_api.main import app
 
+from store.database import Base, engine
+Base.metadata.create_all(bind=engine)
+
 client = TestClient(app)
 faker = Faker()
 

@@ -1,0 +1,85 @@
+name: "HW5 Tests"
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths: [ 'hw2/hw/**' ]
+  push:
+    branches: [ main ]
+    paths: [ 'hw2/hw/**' ]
+
+jobs:
+  test-hw2:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.13", "3.14"]
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: shopuser
+          POSTGRES_PASSWORD: shoppass
+          POSTGRES_DB: shopdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U shopuser -d shopdb"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      working-directory: hw2/hw
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Wait for PostgreSQL
+      run: |
+        for i in $(seq 1 30); do
+          if pg_isready -h localhost -p 5432 -U shopuser -d shopdb >/dev/null 2>&1; then
+            echo "PostgreSQL is ready"
+            exit 0
+          fi
+          echo "Waiting for PostgreSQL... ($i/30)"
+          sleep 2
+        done
+        echo "PostgreSQL did not become ready in time"
+        exit 1
+
+    - name: Check PostgreSQL connectivity
+      working-directory: hw2/hw
+      env:
+        DATABASE_URL: postgresql+psycopg2://shopuser:shoppass@localhost:5432/shopdb
+      run: |
+        python -c "
+        import os, psycopg2
+        url = os.environ['DATABASE_URL'].replace('postgresql+psycopg2://', 'postgresql://')
+        try:
+            conn = psycopg2.connect(url)
+            conn.close()
+            print('PostgreSQL is reachable')
+        except Exception as e:
+            print(f'Cannot connect to PostgreSQL: {e}')
+            raise
+        "
+
+    - name: Run tests
+      working-directory: hw2/hw
+      env:
+        PYTHONPATH: ${{ github.workspace }}/hw2/hw
+        DATABASE_URL: postgresql+psycopg2://shopuser:shoppass@localhost:5432/shopdb
+      run: |
+        pytest tests -v -x --tb=long --cov=shop_api --cov=store --cov-report=term-missing
