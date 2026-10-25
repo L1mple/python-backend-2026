@@ -1,13 +1,13 @@
 name: "HW2 Tests"
 
-# Запускаем тесты при изменении файлов в hw2/hw/
+# Запускаем тесты при изменении файлов в hw2/hw/ и самого workflow
 on:
   pull_request:
     branches: [ main ]
-    paths: [ 'hw2/hw/**' ]
+    paths: [ 'hw2/hw/**', '.github/workflows/hw2-tests.yml' ]
   push:
     branches: [ main ]
-    paths: [ 'hw2/hw/**' ]
+    paths: [ 'hw2/hw/**', '.github/workflows/hw2-tests.yml' ]
 
 jobs:
   test-hw2:
@@ -46,10 +46,10 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Run tests
+    - name: Run tests with coverage (fails below 95%)
       working-directory: hw2/hw
       env:
         PYTHONPATH: ${{ github.workspace }}/hw2/hw
         DATABASE_URL: postgresql+psycopg://shop:shop@localhost:5432/shop
       run: |
-        pytest -v
+        pytest -v --cov --cov-report=term-missing
