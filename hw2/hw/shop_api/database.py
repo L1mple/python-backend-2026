@@ -25,7 +25,7 @@ def __getattr__(name):
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
-def __dir__():
+def __dir__():  # pragma: no cover
     return ["DATABASE_URL", "_engine", "_ensure_engine", "_ensure_session_local", "Base", "get_db", "engine", "AsyncSessionLocal"]
 
 
