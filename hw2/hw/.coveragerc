@@ -1,0 +1,5 @@
+[run]
+core = ctrace
+concurrency =
+    greenlet
+    thread
