@@ -1,24 +1,81 @@
+import sys
+from pathlib import Path
+
 from http import HTTPStatus
 from typing import Any
 from uuid import uuid4
+
+import pytest_asyncio
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 import pytest
 from faker import Faker
 from fastapi.testclient import TestClient
 
-from shop_api.main import app
+sys.path.insert(0, str(Path(__file__).parent))
 
-client = TestClient(app)
+from shop_api.main import app
+from shop_api.core.db import Base, get_async_session
+import shop_api.models
+
+SQLALCHEMY_DATABASE_URL = "sqlite+aiosqlite://"
+
+engine = create_async_engine(
+    SQLALCHEMY_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
+AsyncTestingSessionLocal = sessionmaker(
+    bind=engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autocommit=False,
+    autoflush=False,
+)
+
+async def override_db():
+    async with AsyncTestingSessionLocal() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+
+app.dependency_overrides[get_async_session] = override_db
+
+@pytest_asyncio.fixture(scope="session", autouse=True)
+async def init_db():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+
+
+@pytest_asyncio.fixture
+async def session():
+    async with AsyncTestingSessionLocal() as session:
+        yield session
+
+@pytest.fixture(scope="session")
+def client(init_db):
+    """TestClient создаётся только после того, как init_db создал таблицы."""
+    with TestClient(app) as c:
+        yield c
+
 faker = Faker()
 
 
 @pytest.fixture()
-def existing_empty_cart_id() -> int:
+def existing_empty_cart_id(client) -> int:
     return client.post("/cart").json()["id"]
 
 
 @pytest.fixture(scope="session")
-def existing_items() -> list[int]:
+def existing_items(client) -> list[int]:
     items = [
         {
             "name": f"Тестовый товар {i}",
@@ -31,7 +88,7 @@ def existing_items() -> list[int]:
 
 
 @pytest.fixture(scope="session", autouse=True)
-def existing_not_empty_carts(existing_items: list[int]) -> list[int]:
+def existing_not_empty_carts(existing_items: list[int], client) -> list[int]:
     carts = []
 
     for i in range(20):
@@ -48,6 +105,7 @@ def existing_not_empty_carts(existing_items: list[int]) -> list[int]:
 def existing_not_empty_cart_id(
     existing_empty_cart_id: int,
     existing_items: list[int],
+    client
 ) -> int:
     for item_id in faker.random_elements(existing_items, unique=False, length=3):
         client.post(f"/cart/{existing_empty_cart_id}/add/{item_id}")
@@ -56,7 +114,7 @@ def existing_not_empty_cart_id(
 
 
 @pytest.fixture()
-def existing_item() -> dict[str, Any]:
+def existing_item(client) -> dict[str, Any]:
     return client.post(
         "/item",
         json={
@@ -67,7 +125,7 @@ def existing_item() -> dict[str, Any]:
 
 
 @pytest.fixture()
-def deleted_item(existing_item: dict[str, Any]) -> dict[str, Any]:
+def deleted_item(existing_item: dict[str, Any], client) -> dict[str, Any]:
     item_id = existing_item["id"]
     client.delete(f"/item/{item_id}")
 
@@ -75,7 +133,7 @@ def deleted_item(existing_item: dict[str, Any]) -> dict[str, Any]:
     return existing_item
 
 
-def test_post_cart() -> None:
+def test_post_cart(client) -> None:
     response = client.post("/cart")
 
     assert response.status_code == HTTPStatus.CREATED
@@ -90,7 +148,7 @@ def test_post_cart() -> None:
         ("existing_not_empty_cart_id", True),
     ],
 )
-def test_get_cart(request, cart: int, not_empty: bool) -> None:
+def test_get_cart(request, cart: int, not_empty: bool, client) -> None:
     cart_id = request.getfixturevalue(cart)
 
     response = client.get(f"/cart/{cart_id}")
@@ -131,7 +189,7 @@ def test_get_cart(request, cart: int, not_empty: bool) -> None:
         ({"max_quantity": -1}, HTTPStatus.UNPROCESSABLE_ENTITY),
     ],
 )
-def test_get_cart_list(query: dict[str, Any], status_code: int):
+def test_get_cart_list(query: dict[str, Any], status_code: int, client):
     response = client.get("/cart", params=query)
 
     assert response.status_code == status_code
@@ -156,7 +214,7 @@ def test_get_cart_list(query: dict[str, Any], status_code: int):
             assert quantity <= query["max_quantity"]
 
 
-def test_post_item() -> None:
+def test_post_item(client) -> None:
     item = {"name": "test item", "price": 9.99}
     response = client.post("/item", json=item)
 
@@ -167,7 +225,7 @@ def test_post_item() -> None:
     assert item["name"] == data["name"]
 
 
-def test_get_item(existing_item: dict[str, Any]) -> None:
+def test_get_item(existing_item: dict[str, Any], client) -> None:
     item_id = existing_item["id"]
 
     response = client.get(f"/item/{item_id}")
@@ -190,7 +248,7 @@ def test_get_item(existing_item: dict[str, Any]) -> None:
         ({"max_price": -1}, HTTPStatus.UNPROCESSABLE_ENTITY),
     ],
 )
-def test_get_item_list(query: dict[str, Any], status_code: int) -> None:
+def test_get_item_list(query: dict[str, Any], status_code: int, client) -> None:
     response = client.get("/item", params=query)
 
     assert response.status_code == status_code
@@ -222,6 +280,7 @@ def test_put_item(
     existing_item: dict[str, Any],
     body: dict[str, Any],
     status_code: int,
+    client
 ) -> None:
     item_id = existing_item["id"]
     response = client.put(f"/item/{item_id}", json=body)
@@ -255,7 +314,7 @@ def test_put_item(
         ),
     ],
 )
-def test_patch_item(request, item: str, body: dict[str, Any], status_code: int) -> None:
+def test_patch_item(request, item: str, body: dict[str, Any], status_code: int, client) -> None:
     item_data: dict[str, Any] = request.getfixturevalue(item)
     item_id = item_data["id"]
     response = client.patch(f"/item/{item_id}", json=body)
@@ -271,7 +330,7 @@ def test_patch_item(request, item: str, body: dict[str, Any], status_code: int) 
         assert patched_item == patch_response_body
 
 
-def test_delete_item(existing_item: dict[str, Any]) -> None:
+def test_delete_item(existing_item: dict[str, Any], client) -> None:
     item_id = existing_item["id"]
 
     response = client.delete(f"/item/{item_id}")
@@ -282,3 +341,42 @@ def test_delete_item(existing_item: dict[str, Any]) -> None:
 
     response = client.delete(f"/item/{item_id}")
     assert response.status_code == HTTPStatus.OK
+
+
+def test_chat_broadcast_within_room(client) -> None:
+    """Два клиента в одной комнате видят сообщения друг друга."""
+    with client.websocket_connect("/chat/room1") as ws1, \
+         client.websocket_connect("/chat/room1") as ws2:
+        ws1.send_text("hello")
+        data = ws2.receive_text()
+        assert " :: hello" in data
+        assert data.split(" :: ")[1] == "hello"
+
+
+def test_chat_sender_does_not_receive_own_message(client) -> None:
+    with client.websocket_connect("/chat/room2") as ws1, \
+         client.websocket_connect("/chat/room2") as ws2:
+        ws1.send_text("only for ws2")
+        assert ws2.receive_text().endswith(" :: only for ws2")
+        ws2.send_text("reply")
+        data = ws1.receive_text()
+        assert data.endswith(" :: reply")
+        assert "only for ws2" not in data
+
+
+def test_chat_isolation_between_rooms(client) -> None:
+    """Клиенты из разных комнат не получают сообщения друг друга."""
+    with client.websocket_connect("/chat/alpha") as ws_alpha, \
+         client.websocket_connect("/chat/beta") as ws_beta:
+        ws_beta.send_text("only beta")
+        ws_alpha.send_text("only alpha")
+        with client.websocket_connect("/chat/alpha") as ws_alpha2:
+            ws_alpha2.send_text("alpha msg")
+            data = ws_alpha.receive_text()
+            assert data.endswith(" :: alpha msg")
+            assert "only beta" not in data
+        with client.websocket_connect("/chat/beta") as ws_beta2:
+            ws_beta2.send_text("beta msg")
+            data = ws_beta.receive_text()
+            assert data.endswith(" :: beta msg")
+            assert "only alpha" not in data
