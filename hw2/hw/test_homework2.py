@@ -282,3 +282,26 @@ def test_delete_item(existing_item: dict[str, Any]) -> None:
 
     response = client.delete(f"/item/{item_id}")
     assert response.status_code == HTTPStatus.OK
+
+
+def test_get_cart_not_found():
+    response = client.get("/cart/999999")
+    assert response.status_code == HTTPStatus.NOT_FOUND
+
+
+def test_put_item_not_found():
+    response = client.put("/item/999999", json={"name": "x", "price": 1.0})
+    assert response.status_code == HTTPStatus.NOT_FOUND
+
+
+def test_get_items_hides_deleted():
+    item = client.post("/item", json={"name": "gone", "price": 1.0}).json()
+    client.delete(f"/item/{item['id']}")
+    data = client.get("/item").json()
+    assert all(x["id"] != item["id"] for x in data)
+
+
+def test_get_items_min_price():
+    client.post("/item", json={"name": "cheap", "price": 1.0})
+    data = client.get("/item", params={"min_price": 1000.0}).json()
+    assert all(x["price"] >= 1000.0 for x in data)

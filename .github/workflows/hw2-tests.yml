@@ -1,13 +1,12 @@
 name: "HW2 Tests"
 
-# Запускаем тесты при изменении файлов в hw2/hw/
 on:
   pull_request:
     branches: [ main ]
-    paths: [ 'hw2/hw/**' ]
+    paths: [ 'hw2/hw/**', '.github/workflows/hw2-tests.yml' ]
   push:
     branches: [ main ]
-    paths: [ 'hw2/hw/**' ]
+    paths: [ 'hw2/hw/**', '.github/workflows/hw2-tests.yml' ]
 
 jobs:
   test-hw2:
@@ -15,16 +14,16 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.13", "3.14"]
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
-    
+
     - name: Install dependencies
       working-directory: hw2/hw
       run: |
@@ -36,4 +35,4 @@ jobs:
       env:
         PYTHONPATH: ${{ github.workspace }}/hw2/hw
       run: |
-        pytest test_homework2.py -v
+        pytest test_homework2.py -v --cov=shop_api --cov-report=term-missing --cov-fail-under=95
