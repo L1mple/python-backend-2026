@@ -1,0 +1,6 @@
+fastapi>=0.117.1
+uvicorn>=0.24.0
+websockets>=12.0
+SQLAlchemy>=2.0.36,<2.1
+PyMySQL[rsa]>=1.1.1,<2
+prometheus-fastapi-instrumentator>=7.1.0,<8

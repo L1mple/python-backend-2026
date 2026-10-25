@@ -1,0 +1,2 @@
+-r ../hw2/hw/requirements.txt
+pytest-cov>=7.0,<8

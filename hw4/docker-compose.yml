@@ -1,0 +1,43 @@
+services:
+  shop:
+    environment:
+      DATABASE_URL: mysql+pymysql://shop:shop@mysql/shop?charset=utf8mb4
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: shop
+      MYSQL_USER: shop
+      MYSQL_PASSWORD: shop
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "127.0.0.1:3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_PASSWORD mysql -h 127.0.0.1 -u $$MYSQL_USER $$MYSQL_DATABASE -e 'SELECT 1'"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+
+  transactions:
+    build:
+      context: ..
+      dockerfile: hw3/Dockerfile
+    environment:
+      DATABASE_URL: mysql+pymysql://shop:shop@mysql/shop?charset=utf8mb4
+    volumes:
+      - ../hw4:/homework:ro
+    command: ["python", "/homework/transactions.py"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+    profiles: ["transactions"]
+
+volumes:
+  mysql-data:
