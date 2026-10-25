@@ -64,17 +64,27 @@ async def get_carts(
     min_quantity: Annotated[NonNegativeInt | None, Query()] = None,
     max_quantity: Annotated[NonNegativeInt | None, Query()] = None,
 ) -> list[CartResponse]:
-    carts = [_build_cart(cid) for cid in _carts]
-
-    if min_price is not None:
-        carts = [c for c in carts if c.price >= min_price]
-    if max_price is not None:
-        carts = [c for c in carts if c.price <= max_price]
-    if min_quantity is not None:
-        carts = [c for c in carts if sum(i.quantity for i in c.items) >= min_quantity]
-    if max_quantity is not None:
-        carts = [c for c in carts if sum(i.quantity for i in c.items) <= max_quantity]
-    return carts[offset : offset + limit]
+    carts: list[CartResponse] = []
+    skipped = 0
+    for i in _carts:
+        cart = _build_cart(i)
+        if min_price is not None and cart.price < min_price:
+            continue
+        if max_price is not None and cart.price > max_price:
+            continue
+        total_quantity = sum(j.quantity for j in cart.items)
+        if min_quantity is not None and total_quantity < min_quantity:
+            continue
+        if max_quantity is not None and total_quantity > max_quantity:
+            continue
+        if skipped < offset:
+            skipped += 1
+            continue
+        carts.append(cart)
+        if len(carts) >= limit:
+            break
+        
+    return carts
 
 @app.post("/cart/{cart_id}/add/{item_id}", response_model=CartResponse)
 async def add_item_to_cart(cart_id: int, item_id: int) -> CartResponse:
@@ -122,8 +132,10 @@ async def get_items(
 @app.put("/item/{item_id}", response_model=ItemResponse)
 async def put_item(item_id: int, body: ItemPut) -> ItemResponse:
     item = _items.get(item_id)
-    if item is None or item.deleted:
+    if item is None:
         raise HTTPException(HTTPStatus.NOT_FOUND, "Item not found")
+    if item.deleted:
+        raise HTTPException(HTTPStatus.NOT_MODIFIED, "Item is deleted")
     item.name = body.name
     item.price = body.price
     return item
@@ -131,8 +143,10 @@ async def put_item(item_id: int, body: ItemPut) -> ItemResponse:
 @app.patch("/item/{item_id}", response_model=ItemResponse)
 async def patch_item(item_id: int, body: ItemPatch) -> ItemResponse:
     item = _items.get(item_id)
-    if item is None or item.deleted:
-        raise HTTPException(HTTPStatus.NOT_MODIFIED, "Item not found")
+    if item is None:
+        raise HTTPException(HTTPStatus.NOT_FOUND, "Item not found")
+    if item.deleted:
+        raise HTTPException(HTTPStatus.NOT_MODIFIED, "Item is deleted")
 
     if body.name is not None:
         item.name = body.name
@@ -143,6 +157,7 @@ async def patch_item(item_id: int, body: ItemPatch) -> ItemResponse:
 @app.delete("/item/{item_id}")
 async def delete_item(item_id: int) -> dict:
     item = _items.get(item_id)
-    if item is not None:
-        item.deleted = True
+    if item is None:
+        raise HTTPException(HTTPStatus.NOT_FOUND, "Item not found")
+    item.deleted = True
     return {}
