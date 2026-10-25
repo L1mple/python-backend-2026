@@ -36,4 +36,4 @@ jobs:
       env:
         PYTHONPATH: ${{ github.workspace }}/hw2/hw
       run: |
-        pytest test_homework2.py -v
+        pytest --cov=shop_api --cov-branch --cov-report=term-missing test_homework2_extra.py
