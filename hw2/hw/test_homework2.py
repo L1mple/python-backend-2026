@@ -282,3 +282,37 @@ def test_delete_item(existing_item: dict[str, Any]) -> None:
 
     response = client.delete(f"/item/{item_id}")
     assert response.status_code == HTTPStatus.OK
+
+def test_get_missing_cart() -> None:
+    response = client.get("/cart/999_999_999")
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    
+def test_add_item_to_missing_cart() -> None:
+    response = client.post("/cart/999_999_999/add/1")
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    
+def test_add_missing_item_to_cart(existing_empty_cart_id: int) -> None:
+    response = client.post(f"/cart/{existing_empty_cart_id}/add/999_999_999")
+    assert response.status_code == HTTPStatus.NOT_FOUND
+
+def test_put_missing_item() -> None:
+    response = client.put(
+        "/item/999_999_999",
+        json={"name": "Ligma", "price": 4.67},
+    )
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    
+def test_patch_missing_item() -> None:
+    response = client.patch("/item/999_999_999", json={})
+    assert response.status_code == HTTPStatus.NOT_FOUND
+
+def test_delete_missing_item() -> None:
+    response = client.delete("/item/999_999_999")
+    assert response.status_code == HTTPStatus.NOT_FOUND
+
+def test_put_deleted_item(deleted_item: dict[str, Any]) -> None:
+    response = client.put(
+        f"/item/{deleted_item['id']}",
+        json={"name": "new name", "price": 9.99},
+    )
+    assert response.status_code == HTTPStatus.NOT_MODIFIED
