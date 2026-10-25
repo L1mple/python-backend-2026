@@ -37,3 +37,4 @@ jobs:
         PYTHONPATH: ${{ github.workspace }}/hw2/hw
       run: |
         pytest test_homework2.py -v
+        python -m pytest -v --cov=shop_api --cov-report=term-missing --cov-fail-under=95
