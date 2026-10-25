@@ -1,0 +1,70 @@
+name: "HW4 Tests"
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "hw4/**"
+      - ".github/workflows/hw4-tests.yml"
+  push:
+    branches: [main, hw4, hw5]
+    paths:
+      - "hw4/**"
+      - ".github/workflows/hw4-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test-hw4:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://user:password@localhost:5433/master
+
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: master
+        options: >-
+          --health-cmd "pg_isready -h localhost -U user -d master"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+          --health-start-period 10s
+        ports:
+          - 5433:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: hw4/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r hw4/requirements.txt
+
+      - name: Run tests with coverage
+        run: |
+          python -m pytest -v \
+            --cov=hw4.lib \
+            --cov-report=term-missing \
+            --cov-report=xml:cobertura.xml \
+            --cov-fail-under=95 \
+            hw4/tests
+
+      - name: Upload coverage to Coveralls
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          format: cobertura
+          file: cobertura.xml
