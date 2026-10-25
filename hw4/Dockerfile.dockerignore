@@ -1,0 +1,9 @@
+*
+!hw2/
+!hw2/hw/
+!hw2/hw/requirements.txt
+!hw2/hw/shop_api/
+!hw2/hw/shop_api/*.py
+!hw4/
+!hw4/Dockerfile
+!hw4/isolation.py
