@@ -35,5 +35,6 @@ jobs:
       working-directory: hw2/hw
       env:
         PYTHONPATH: ${{ github.workspace }}/hw2/hw
+        DATABASE_URL: "sqlite+aiosqlite:///./test_hw2.db"
       run: |
         pytest test_homework2.py -v
