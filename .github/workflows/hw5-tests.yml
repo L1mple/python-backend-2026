@@ -1,0 +1,27 @@
+name: HW5 Tests
+
+on:
+  push:
+    branches: [hw5]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        working-directory: hw5
+        run: python -m pip install -r requirements-coverage.txt
+
+      - name: Run tests with coverage
+        working-directory: hw5
+        run: |
+          python -m pytest test_homework2.py test_hw5_coverage.py -q --cov=shop_api --cov-branch --cov-report=term --cov-fail-under=95
