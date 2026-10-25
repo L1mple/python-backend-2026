@@ -1,0 +1,68 @@
+name: HW5 Tests and Coverage
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "hw5/**"
+      - ".github/workflows/hw5-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "hw5/**"
+      - ".github/workflows/hw5-tests.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hw5-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    defaults:
+      run:
+        working-directory: hw5
+
+    env:
+      PYTHONPATH: ${{ github.workspace }}/hw5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: hw5/requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run tests and enforce coverage
+        run: >-
+          python -m pytest
+          ../hw2/hw/test_homework2.py
+          tests
+          --cov=shop_api
+          --cov-config=.coveragerc
+          --cov-report=term-missing
+          --cov-report=xml:coverage.xml
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hw5-coverage-python-${{ matrix.python-version }}
+          path: hw5/coverage.xml
+          if-no-files-found: error

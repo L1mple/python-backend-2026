@@ -1,0 +1,6 @@
+fastapi>=0.117.1,<1
+uvicorn>=0.24,<1
+httpx>=0.27,<1
+Faker>=37,<41
+pytest>=8,<10
+pytest-cov>=6,<8
