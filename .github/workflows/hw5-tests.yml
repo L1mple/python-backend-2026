@@ -1,0 +1,42 @@
+name: "HW5 Tests"
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "lecture5/hw/hw5/**"
+      - ".github/workflows/hw5-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "lecture5/hw/hw5/**"
+      - ".github/workflows/hw5-tests.yml"
+
+jobs:
+  test-hw5:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.13", "3.14"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        working-directory: lecture5/hw/hw5
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r hw/requirements.txt
+
+      - name: Run tests with coverage
+        working-directory: lecture5/hw/hw5
+        env:
+          PYTHONPATH: ${{ github.workspace }}/lecture5/hw/hw5
+        run: |
+          pytest --cov=hw --cov-report=term-missing --cov-fail-under=95
