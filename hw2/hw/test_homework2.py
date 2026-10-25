@@ -282,3 +282,42 @@ def test_delete_item(existing_item: dict[str, Any]) -> None:
 
     response = client.delete(f"/item/{item_id}")
     assert response.status_code == HTTPStatus.OK
+
+def test_get_missing_item() -> None:
+    response = client.get("/item/999999")
+
+    assert response.status_code == HTTPStatus.NOT_FOUND
+
+
+def test_get_missing_cart() -> None:
+    response = client.get("/cart/999999")
+
+    assert response.status_code == HTTPStatus.NOT_FOUND
+
+
+def test_put_missing_item() -> None:
+    response = client.put(
+        "/item/999999",
+        json={
+            "name": "missing",
+            "price": 10.0,
+        },
+    )
+
+    assert response.status_code == HTTPStatus.NOT_MODIFIED
+
+
+def test_add_to_missing_cart(existing_item: dict[str, Any]) -> None:
+    response = client.post(
+        f"/cart/999999/add/{existing_item['id']}"
+    )
+
+    assert response.status_code == HTTPStatus.NOT_FOUND
+
+
+def test_add_missing_item_to_cart(existing_empty_cart_id: int) -> None:
+    response = client.post(
+        f"/cart/{existing_empty_cart_id}/add/999999"
+    )
+
+    assert response.status_code == HTTPStatus.NOT_FOUND

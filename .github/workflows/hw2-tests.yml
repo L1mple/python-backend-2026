@@ -12,28 +12,54 @@ on:
 jobs:
   test-hw2:
     runs-on: ubuntu-latest
+
     strategy:
       matrix:
         python-version: ["3.13", "3.14"]
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-    
-    - name: Install dependencies
-      working-directory: hw2/hw
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
 
-    - name: Run tests
-      working-directory: hw2/hw
-      env:
-        PYTHONPATH: ${{ github.workspace }}/hw2/hw
-      run: |
-        pytest test_homework2.py -v
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: shop
+          POSTGRES_USER: shop
+          POSTGRES_PASSWORD: shop
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U shop -d shop"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql+psycopg2://shop:shop@localhost:5432/shop
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        working-directory: hw2/hw
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Create database tables
+        working-directory: hw2/hw
+        env:
+          PYTHONPATH: ${{ github.workspace }}/hw2/hw
+        run: |
+          python -c "from shop_api.database import create_db_and_tables; create_db_and_tables()"
+
+      - name: Run tests
+        working-directory: hw2/hw
+        env:
+          PYTHONPATH: ${{ github.workspace }}/hw2/hw
+        run: |
+          pytest test_homework2.py -v
