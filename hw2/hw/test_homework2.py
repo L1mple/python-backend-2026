@@ -6,19 +6,17 @@ import pytest
 from faker import Faker
 from fastapi.testclient import TestClient
 
-from shop_api.main import app
-
-client = TestClient(app)
 faker = Faker()
+faker.seed_instance(0)
 
 
 @pytest.fixture()
-def existing_empty_cart_id() -> int:
+def existing_empty_cart_id(client: TestClient) -> int:
     return client.post("/cart").json()["id"]
 
 
-@pytest.fixture(scope="session")
-def existing_items() -> list[int]:
+@pytest.fixture()
+def existing_items(client: TestClient) -> list[int]:
     items = [
         {
             "name": f"Тестовый товар {i}",
@@ -30,8 +28,8 @@ def existing_items() -> list[int]:
     return [client.post("/item", json=item).json()["id"] for item in items]
 
 
-@pytest.fixture(scope="session", autouse=True)
-def existing_not_empty_carts(existing_items: list[int]) -> list[int]:
+@pytest.fixture()
+def existing_not_empty_carts(client: TestClient, existing_items: list[int]) -> list[int]:
     carts = []
 
     for i in range(20):
@@ -46,6 +44,7 @@ def existing_not_empty_carts(existing_items: list[int]) -> list[int]:
 
 @pytest.fixture()
 def existing_not_empty_cart_id(
+    client: TestClient,
     existing_empty_cart_id: int,
     existing_items: list[int],
 ) -> int:
@@ -56,7 +55,7 @@ def existing_not_empty_cart_id(
 
 
 @pytest.fixture()
-def existing_item() -> dict[str, Any]:
+def existing_item(client: TestClient) -> dict[str, Any]:
     return client.post(
         "/item",
         json={
@@ -67,7 +66,7 @@ def existing_item() -> dict[str, Any]:
 
 
 @pytest.fixture()
-def deleted_item(existing_item: dict[str, Any]) -> dict[str, Any]:
+def deleted_item(client: TestClient, existing_item: dict[str, Any]) -> dict[str, Any]:
     item_id = existing_item["id"]
     client.delete(f"/item/{item_id}")
 
@@ -75,7 +74,7 @@ def deleted_item(existing_item: dict[str, Any]) -> dict[str, Any]:
     return existing_item
 
 
-def test_post_cart() -> None:
+def test_post_cart(client: TestClient) -> None:
     response = client.post("/cart")
 
     assert response.status_code == HTTPStatus.CREATED
@@ -90,7 +89,7 @@ def test_post_cart() -> None:
         ("existing_not_empty_cart_id", True),
     ],
 )
-def test_get_cart(request, cart: int, not_empty: bool) -> None:
+def test_get_cart(client: TestClient, request, cart: int, not_empty: bool) -> None:
     cart_id = request.getfixturevalue(cart)
 
     response = client.get(f"/cart/{cart_id}")
@@ -131,7 +130,12 @@ def test_get_cart(request, cart: int, not_empty: bool) -> None:
         ({"max_quantity": -1}, HTTPStatus.UNPROCESSABLE_ENTITY),
     ],
 )
-def test_get_cart_list(query: dict[str, Any], status_code: int):
+def test_get_cart_list(
+    client: TestClient,
+    existing_not_empty_carts: list[int],
+    query: dict[str, Any],
+    status_code: int,
+):
     response = client.get("/cart", params=query)
 
     assert response.status_code == status_code
@@ -156,7 +160,7 @@ def test_get_cart_list(query: dict[str, Any], status_code: int):
             assert quantity <= query["max_quantity"]
 
 
-def test_post_item() -> None:
+def test_post_item(client: TestClient) -> None:
     item = {"name": "test item", "price": 9.99}
     response = client.post("/item", json=item)
 
@@ -167,7 +171,7 @@ def test_post_item() -> None:
     assert item["name"] == data["name"]
 
 
-def test_get_item(existing_item: dict[str, Any]) -> None:
+def test_get_item(client: TestClient, existing_item: dict[str, Any]) -> None:
     item_id = existing_item["id"]
 
     response = client.get(f"/item/{item_id}")
@@ -190,7 +194,12 @@ def test_get_item(existing_item: dict[str, Any]) -> None:
         ({"max_price": -1}, HTTPStatus.UNPROCESSABLE_ENTITY),
     ],
 )
-def test_get_item_list(query: dict[str, Any], status_code: int) -> None:
+def test_get_item_list(
+    client: TestClient,
+    existing_items: list[int],
+    query: dict[str, Any],
+    status_code: int,
+) -> None:
     response = client.get("/item", params=query)
 
     assert response.status_code == status_code
@@ -219,6 +228,7 @@ def test_get_item_list(query: dict[str, Any], status_code: int) -> None:
     ],
 )
 def test_put_item(
+    client: TestClient,
     existing_item: dict[str, Any],
     body: dict[str, Any],
     status_code: int,
@@ -255,7 +265,13 @@ def test_put_item(
         ),
     ],
 )
-def test_patch_item(request, item: str, body: dict[str, Any], status_code: int) -> None:
+def test_patch_item(
+    client: TestClient,
+    request,
+    item: str,
+    body: dict[str, Any],
+    status_code: int,
+) -> None:
     item_data: dict[str, Any] = request.getfixturevalue(item)
     item_id = item_data["id"]
     response = client.patch(f"/item/{item_id}", json=body)
@@ -271,7 +287,7 @@ def test_patch_item(request, item: str, body: dict[str, Any], status_code: int) 
         assert patched_item == patch_response_body
 
 
-def test_delete_item(existing_item: dict[str, Any]) -> None:
+def test_delete_item(client: TestClient, existing_item: dict[str, Any]) -> None:
     item_id = existing_item["id"]
 
     response = client.delete(f"/item/{item_id}")

@@ -1,0 +1,75 @@
+PostgreSQL 16.15 on aarch64-unknown-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit
+Temporary demonstration schema: hw4_isolation_5156b58b60fe47a287b16df9d421d60e
+
+Dirty read / READ UNCOMMITTED
+  T1 connection=81; T2 connection=82
+  T1 SELECT balance: 100
+  T2 UPDATE balance=200, without COMMIT
+  T1 SELECT balance while T2 is uncommitted: 100
+  T2 ROLLBACK; T1 SELECT balance: 100
+  PASS: no dirty read; PostgreSQL treats READ UNCOMMITTED as READ COMMITTED
+
+Dirty read / READ COMMITTED
+  T1 connection=81; T2 connection=82
+  T1 SELECT balance: 100
+  T2 UPDATE balance=200, without COMMIT
+  T1 SELECT balance while T2 is uncommitted: 100
+  T2 ROLLBACK; T1 SELECT balance: 100
+  PASS: no dirty read; PostgreSQL treats READ UNCOMMITTED as READ COMMITTED
+
+Non-repeatable read / READ COMMITTED
+  T1 connection=81; T2 connection=82
+  T1 SELECT balance: 100
+  T2 UPDATE balance=200; COMMIT
+  T1 SELECT balance again, in the same transaction: 200
+  PASS: non-repeatable read reproduced
+
+Non-repeatable read / REPEATABLE READ
+  T1 connection=81; T2 connection=82
+  T1 SELECT balance: 100
+  T2 UPDATE balance=200; COMMIT
+  T1 SELECT balance again, in the same transaction: 100
+  PASS: non-repeatable read prevented
+
+Phantom read / READ COMMITTED
+  T1 connection=81; T2 connection=82
+  T1 SELECT count(*) WHERE balance >= 100: 1
+  T2 INSERT account with balance=200; COMMIT
+  T1 repeat the same SELECT, in the same transaction: 2
+  PASS: phantom read reproduced
+
+Phantom read / REPEATABLE READ
+  T1 connection=81; T2 connection=82
+  T1 SELECT count(*) WHERE balance >= 100: 1
+  T2 INSERT account with balance=200; COMMIT
+  T1 repeat the same SELECT, in the same transaction: 1
+  PASS: phantom read prevented
+  PostgreSQL REPEATABLE READ already prevents phantoms; this differs from the SQL minimum
+
+Phantom read / SERIALIZABLE
+  T1 connection=81; T2 connection=82
+  T1 SELECT count(*) WHERE balance >= 100: 1
+  T2 INSERT account with balance=200; COMMIT
+  T1 repeat the same SELECT, in the same transaction: 1
+  PASS: phantom read prevented
+
+Write skew / REPEATABLE READ
+  Rule: at least one doctor must remain on call
+  T1 connection=81; T2 connection=82
+  T1 SELECT on-call count: 2; T2 SELECT on-call count: 2
+  T1 takes doctor 1 off call; COMMIT
+  T2 takes doctor 2 off call using its earlier count; COMMIT
+  PASS: write skew reproduced; both committed, 0 doctors remain on call
+
+Write skew / SERIALIZABLE
+  Rule: at least one doctor must remain on call
+  T1 connection=82; T2 connection=81
+  T1 SELECT on-call count: 2; T2 SELECT on-call count: 2
+  T1 takes doctor 1 off call; COMMIT
+  T2 rejected with SQLSTATE 40001; ROLLBACK
+  T2 retry: NEW transaction, SELECT on-call count again: 1
+  T2 retry: doctor 2 must stay on call; COMMIT without UPDATE
+  PASS: serialization failure and a full transaction retry preserve the rule
+
+All 9 isolation scenarios passed
+Removed demonstration schema: hw4_isolation_5156b58b60fe47a287b16df9d421d60e
