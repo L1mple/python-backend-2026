@@ -1,39 +1,70 @@
-name: "HW2 Tests"
+name: HW2 Tests
 
-# Запускаем тесты при изменении файлов в hw2/hw/
 on:
   pull_request:
-    branches: [ main ]
-    paths: [ 'hw2/hw/**' ]
+    branches: [main]
+    paths:
+      - "hw2/hw/**"
+      - ".github/workflows/hw2-tests.yml"
   push:
-    branches: [ main ]
-    paths: [ 'hw2/hw/**' ]
+    paths:
+      - "hw2/hw/**"
+      - ".github/workflows/hw2-tests.yml"
+
+permissions:
+  contents: read
 
 jobs:
   test-hw2:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       matrix:
         python-version: ["3.13", "3.14"]
-    
+    services:
+      database:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_PID: Developer
+          MSSQL_SA_PASSWORD: ShopApi2026
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P ShopApi2026 -Q 'SELECT 1' -b"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+          --health-start-period 20s
+    env:
+      TEST_DATABASE_URL: mssql+pymssql://sa:ShopApi2026@localhost:1433/shop_test
+    defaults:
+      run:
+        working-directory: hw2/hw
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-    
-    - name: Install dependencies
-      working-directory: hw2/hw
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Run tests
-      working-directory: hw2/hw
-      env:
-        PYTHONPATH: ${{ github.workspace }}/hw2/hw
-      run: |
-        pytest test_homework2.py -v
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Create test database
+        run: >-
+          python -c "import pymssql;
+          connection = pymssql.connect(server='localhost', user='sa', password='ShopApi2026', autocommit=True);
+          connection.cursor().execute('CREATE DATABASE shop_test');
+          connection.close()"
+
+      - name: Run tests with coverage
+        run: python -m pytest -q
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.python-version }}
+          path: hw2/hw/coverage.xml

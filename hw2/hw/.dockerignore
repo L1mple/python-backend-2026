@@ -1,0 +1,5 @@
+__pycache__/
+shop.db
+.pytest_cache/
+*.py[cod]
+test_*.py
