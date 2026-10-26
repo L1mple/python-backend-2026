@@ -1,0 +1,56 @@
+
+# dirty read, A: READ UNCOMMITTED
+A: уровень в postgres = read uncommitted
+B: balance = 0, без commit
+A: balance = 100
+аномалии нет
+
+# dirty read, A: READ COMMITTED
+A: уровень в postgres = read committed
+B: balance = 0, без commit
+A: balance = 100
+аномалии нет
+
+# non-repeatable read, A: READ COMMITTED
+A: balance = 100
+B: balance = 50, commit
+A: balance = 50
+аномалия есть
+
+# non-repeatable read, A: REPEATABLE READ
+A: balance = 100
+B: balance = 50, commit
+A: balance = 100
+аномалии нет
+
+# phantom read, A: READ COMMITTED
+A: count(balance >= 100) = 2
+B: insert carol, commit
+A: count(balance >= 100) = 3
+аномалия есть
+
+# phantom read, A: REPEATABLE READ
+A: count(balance >= 100) = 2
+B: insert carol, commit
+A: count(balance >= 100) = 2
+аномалии нет
+
+# phantom read, A: SERIALIZABLE
+A: count(balance >= 100) = 2
+B: insert carol, commit
+A: count(balance >= 100) = 2
+аномалии нет
+
+# write skew, A и B: REPEATABLE READ
+A: sum = 200, снимает 150 с alice
+B: sum = 200, снимает 150 с bob
+B: commit
+итоговая сумма = -100
+аномалия есть
+
+# write skew, A и B: SERIALIZABLE
+A: sum = 200, снимает 150 с alice
+B: sum = 200, снимает 150 с bob
+B: commit отклонён, SerializationFailure
+итоговая сумма = 50
+аномалии нет
