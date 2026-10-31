@@ -282,3 +282,40 @@ def test_delete_item(existing_item: dict[str, Any]) -> None:
 
     response = client.delete(f"/item/{item_id}")
     assert response.status_code == HTTPStatus.OK
+
+def test_get_nonexistent_item() -> None:
+    response = client.get("/item/999999")
+    assert response.status_code == HTTPStatus.NOT_FOUND
+
+def test_get_nonexistent_cart() -> None:
+    response = client.get("/cart/999999")
+    assert response.status_code == HTTPStatus.NOT_FOUND
+
+def test_add_item_to_nonexistent_cart(existing_item: dict) -> None:
+    response = client.post(f"/cart/999999/add/{existing_item['id']}")
+    assert response.status_code == HTTPStatus.NOT_FOUND
+
+def test_add_nonexistent_item_to_cart(existing_empty_cart_id: int) -> None:
+    response = client.post(f"/cart/{existing_empty_cart_id}/add/999999")
+    assert response.status_code == HTTPStatus.NOT_FOUND
+
+def test_patch_deleted_item(existing_item: dict) -> None:
+    item_id = existing_item["id"]
+    client.delete(f"/item/{item_id}")
+    response = client.patch(f"/item/{item_id}", json={"price": 10.0})
+    assert response.status_code == HTTPStatus.NOT_MODIFIED
+
+def test_patch_item_with_deleted_field(existing_item: dict) -> None:
+    item_id = existing_item["id"]
+    response = client.patch(f"/item/{item_id}", json={"deleted": True})
+    assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+
+def test_websocket_chat() -> None:
+    with client.websocket_connect("/chat/test_room") as ws:
+        ws.send_text("Hello WebSocket")
+        data = ws.receive_text()
+        assert " :: Hello WebSocket" in data
+
+def test_websocket_disconnect() -> None:
+    with client.websocket_connect("/chat/test_room") as ws:
+        pass
