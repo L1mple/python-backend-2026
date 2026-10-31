@@ -1,0 +1,4 @@
+fastapi>=0.117.1,<1
+pydantic>=2.9,<3
+uvicorn>=0.24,<1
+prometheus-fastapi-instrumentator>=7,<8
