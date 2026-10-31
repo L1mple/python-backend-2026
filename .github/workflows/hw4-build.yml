@@ -1,0 +1,18 @@
+name: HW4 Docker build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check Compose configuration
+        run: docker compose -f hw3/docker-compose.yml config --quiet
+
+      - name: Build application image
+        run: docker compose -f hw3/docker-compose.yml build local
