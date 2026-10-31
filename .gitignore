@@ -7,6 +7,10 @@ venv/
 # C extensions
 *.so
 
+.coverage
+coverage.xml
+htmlcov/
+
 # Distribution / packaging
 .Python
 build/

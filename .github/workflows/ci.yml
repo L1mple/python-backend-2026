@@ -1,0 +1,41 @@
+name: HW2 CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r hw2/hw/requirements.txt
+
+      - name: Run tests with coverage
+        working-directory: hw2/hw
+        env:
+          PYTHONPATH: ${{ github.workspace }}/hw2/hw
+        run: |
+          pytest -vv --strict \
+            --cov=./shop_api \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-fail-under=95 \
+            ./test_homework2.py ./test_homework2_extra.py
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: hw2/hw/coverage.xml
