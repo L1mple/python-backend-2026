@@ -9,31 +9,30 @@ router = APIRouter(prefix="/cart")
 
 
 def _to_response(cart: store.CartInfo) -> CartResponse:
-    items = []
-    for item_id, quantity in cart.items.items():
-        item = store.get_item(item_id)
-        if item is None:
-            continue
-        items.append(
+    return CartResponse(
+        id=cart.id,
+        items=[
             CartItemResponse(
                 id=item.id,
                 name=item.name,
-                quantity=quantity,
-                available=not item.deleted,
+                quantity=item.quantity,
+                available=item.available,
             )
-        )
-    return CartResponse(id=cart.id, items=items, price=store.cart_price(cart))
+            for item in cart.items
+        ],
+        price=cart.price,
+    )
 
 
 @router.post("", status_code=HTTPStatus.CREATED)
-async def post_cart(response: Response) -> dict[str, int]:
+def post_cart(response: Response) -> dict[str, int]:
     cart = store.add_cart()
     response.headers["location"] = f"/cart/{cart.id}"
     return {"id": cart.id}
 
 
 @router.get("/{id}")
-async def get_cart_by_id(id: int) -> CartResponse:
+def get_cart_by_id(id: int) -> CartResponse:
     cart = store.get_cart(id)
     if cart is None:
         raise HTTPException(HTTPStatus.NOT_FOUND, f"Cart {id} not found")
@@ -41,7 +40,7 @@ async def get_cart_by_id(id: int) -> CartResponse:
 
 
 @router.get("")
-async def get_cart_list(
+def get_cart_list(
     offset: int = Query(0, ge=0),
     limit: int = Query(10, gt=0),
     min_price: float | None = Query(None, ge=0),
@@ -54,7 +53,7 @@ async def get_cart_list(
 
 
 @router.post("/{cart_id}/add/{item_id}")
-async def post_add_item_to_cart(cart_id: int, item_id: int) -> CartResponse:
+def post_add_item_to_cart(cart_id: int, item_id: int) -> CartResponse:
     cart = store.add_item_to_cart(cart_id, item_id)
     if cart is None:
         raise HTTPException(HTTPStatus.NOT_FOUND, "Cart or item not found")

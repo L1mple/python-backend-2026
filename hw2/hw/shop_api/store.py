@@ -1,4 +1,10 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+
+from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.orm import Session
+
+from shop_api.db import CartItemModel, CartModel, ItemModel, SessionLocal
 
 
 @dataclass(slots=True)
@@ -10,38 +16,41 @@ class ItemInfo:
 
 
 @dataclass(slots=True)
+class CartItemInfo:
+    id: int
+    name: str
+    quantity: int
+    available: bool
+
+
+@dataclass(slots=True)
 class CartInfo:
     id: int
-    items: dict[int, int] = field(default_factory=dict)  # item_id -> quantity
+    items: list[CartItemInfo]
+    price: float
 
 
-_items: dict[int, ItemInfo] = {}
-_carts: dict[int, CartInfo] = {}
-_item_id_counter = 0
-_cart_id_counter = 0
-
-
-def _next_item_id() -> int:
-    global _item_id_counter
-    _item_id_counter += 1
-    return _item_id_counter
-
-
-def _next_cart_id() -> int:
-    global _cart_id_counter
-    _cart_id_counter += 1
-    return _cart_id_counter
+def _item_info(model: ItemModel) -> ItemInfo:
+    return ItemInfo(
+        id=model.id,
+        name=model.name,
+        price=model.price,
+        deleted=model.deleted,
+    )
 
 
 def add_item(name: str, price: float) -> ItemInfo:
-    item_id = _next_item_id()
-    item = ItemInfo(id=item_id, name=name, price=price)
-    _items[item_id] = item
-    return item
+    with SessionLocal.begin() as session:
+        model = ItemModel(name=name, price=price, deleted=False)
+        session.add(model)
+        session.flush()
+        return _item_info(model)
 
 
 def get_item(item_id: int) -> ItemInfo | None:
-    return _items.get(item_id)
+    with SessionLocal() as session:
+        model = session.get(ItemModel, item_id)
+        return _item_info(model) if model else None
 
 
 def list_items(
@@ -51,70 +60,85 @@ def list_items(
     max_price: float | None = None,
     show_deleted: bool = False,
 ) -> list[ItemInfo]:
-    result = []
-    for item in _items.values():
-        if not show_deleted and item.deleted:
-            continue
-        if min_price is not None and item.price < min_price:
-            continue
-        if max_price is not None and item.price > max_price:
-            continue
-        result.append(item)
+    stmt = select(ItemModel)
+    if not show_deleted:
+        stmt = stmt.where(ItemModel.deleted.is_(False))
+    if min_price is not None:
+        stmt = stmt.where(ItemModel.price >= min_price)
+    if max_price is not None:
+        stmt = stmt.where(ItemModel.price <= max_price)
+    stmt = stmt.order_by(ItemModel.id).offset(offset).limit(limit)
 
-    result.sort(key=lambda i: i.id)
-    return result[offset : offset + limit]
+    with SessionLocal() as session:
+        return [_item_info(model) for model in session.scalars(stmt)]
 
 
 def replace_item(item_id: int, name: str, price: float) -> ItemInfo | None:
-    item = _items.get(item_id)
-    if item is None:
-        return None
-    item.name = name
-    item.price = price
-    return item
+    with SessionLocal.begin() as session:
+        model = session.get(ItemModel, item_id)
+        if model is None:
+            return None
+        model.name = name
+        model.price = price
+        return _item_info(model)
 
 
 def patch_item(item_id: int, name: str | None, price: float | None) -> ItemInfo | None:
-    item = _items.get(item_id)
-    if item is None:
-        return None
-    if name is not None:
-        item.name = name
-    if price is not None:
-        item.price = price
-    return item
+    with SessionLocal.begin() as session:
+        model = session.get(ItemModel, item_id)
+        if model is None:
+            return None
+        if name is not None:
+            model.name = name
+        if price is not None:
+            model.price = price
+        return _item_info(model)
 
 
 def delete_item(item_id: int) -> ItemInfo | None:
-    item = _items.get(item_id)
-    if item is None:
-        return None
-    item.deleted = True
-    return item
+    with SessionLocal.begin() as session:
+        model = session.get(ItemModel, item_id)
+        if model is None:
+            return None
+        model.deleted = True
+        return _item_info(model)
 
 
 def add_cart() -> CartInfo:
-    cart_id = _next_cart_id()
-    cart = CartInfo(id=cart_id)
-    _carts[cart_id] = cart
-    return cart
+    with SessionLocal.begin() as session:
+        model = CartModel()
+        session.add(model)
+        session.flush()
+        return CartInfo(id=model.id, items=[], price=0.0)
+
+
+def _load_cart(session: Session, cart_id: int) -> CartInfo | None:
+    if session.get(CartModel, cart_id) is None:
+        return None
+
+    rows = session.execute(
+        select(ItemModel, CartItemModel.quantity)
+        .join(CartItemModel, CartItemModel.item_id == ItemModel.id)
+        .where(CartItemModel.cart_id == cart_id)
+        .order_by(ItemModel.id)
+    ).all()
+
+    items = [
+        CartItemInfo(
+            id=item.id,
+            name=item.name,
+            quantity=quantity,
+            available=not item.deleted,
+        )
+        for item, quantity in rows
+    ]
+    price = sum((item.price * quantity for item, quantity in rows), 0.0)
+    return CartInfo(id=cart_id, items=items, price=price)
 
 
 def get_cart(cart_id: int) -> CartInfo | None:
-    return _carts.get(cart_id)
-
-
-def cart_price(cart: CartInfo) -> float:
-    total = 0.0
-    for item_id, quantity in cart.items.items():
-        item = _items.get(item_id)
-        if item is not None:
-            total += item.price * quantity
-    return total
-
-
-def cart_quantity(cart: CartInfo) -> int:
-    return sum(cart.items.values())
+    with SessionLocal() as session:
+        return _load_cart(session, cart_id)
 
 
 def list_carts(
@@ -125,31 +149,46 @@ def list_carts(
     min_quantity: int | None = None,
     max_quantity: int | None = None,
 ) -> list[CartInfo]:
-    result = []
-    for cart in _carts.values():
-        price = cart_price(cart)
-        quantity = cart_quantity(cart)
+    price = func.coalesce(func.sum(ItemModel.price * CartItemModel.quantity), 0.0)
+    quantity = func.coalesce(func.sum(CartItemModel.quantity), 0)
 
-        if min_price is not None and price < min_price:
-            continue
-        if max_price is not None and price > max_price:
-            continue
-        if min_quantity is not None and quantity < min_quantity:
-            continue
-        if max_quantity is not None and quantity > max_quantity:
-            continue
+    stmt = (
+        select(CartModel.id)
+        .outerjoin(CartItemModel, CartItemModel.cart_id == CartModel.id)
+        .outerjoin(ItemModel, ItemModel.id == CartItemModel.item_id)
+        .group_by(CartModel.id)
+    )
+    if min_price is not None:
+        stmt = stmt.having(price >= min_price)
+    if max_price is not None:
+        stmt = stmt.having(price <= max_price)
+    if min_quantity is not None:
+        stmt = stmt.having(quantity >= min_quantity)
+    if max_quantity is not None:
+        stmt = stmt.having(quantity <= max_quantity)
+    stmt = stmt.order_by(CartModel.id).offset(offset).limit(limit)
 
-        result.append(cart)
-
-    result.sort(key=lambda c: c.id)
-    return result[offset : offset + limit]
+    with SessionLocal() as session:
+        cart_ids = session.scalars(stmt).all()
+        carts = [_load_cart(session, cart_id) for cart_id in cart_ids]
+        return [cart for cart in carts if cart is not None]
 
 
 def add_item_to_cart(cart_id: int, item_id: int) -> CartInfo | None:
-    cart = _carts.get(cart_id)
-    if cart is None:
-        return None
-    if item_id not in _items:
-        return None
-    cart.items[item_id] = cart.items.get(item_id, 0) + 1
-    return cart
+    with SessionLocal.begin() as session:
+        if session.get(CartModel, cart_id) is None:
+            return None
+        if session.get(ItemModel, item_id) is None:
+            return None
+
+        stmt = pg_insert(CartItemModel).values(
+            cart_id=cart_id,
+            item_id=item_id,
+            quantity=1,
+        )
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["cart_id", "item_id"],
+            set_={"quantity": CartItemModel.quantity + 1},
+        )
+        session.execute(stmt)
+        return _load_cart(session, cart_id)
