@@ -1,0 +1,8 @@
+Dirty read / READ UNCOMMITTED: read 100; uncommitted 200 is invisible
+Dirty read / READ COMMITTED: read 100; uncommitted 200 is invisible
+Repeated read / READ COMMITTED: 100 -> 200
+Repeated read / REPEATABLE READ: 100 -> 100
+Phantom read / READ COMMITTED: 1 -> 2 rows
+Phantom read / REPEATABLE READ: 1 -> 1 rows
+Phantom read / SERIALIZABLE: 1 -> 1 rows
+All isolation checks passed
