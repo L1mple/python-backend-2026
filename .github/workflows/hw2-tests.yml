@@ -1,39 +1,42 @@
-name: "HW2 Tests"
+name: HW5 tests
 
-# Запускаем тесты при изменении файлов в hw2/hw/
 on:
-  pull_request:
-    branches: [ main ]
-    paths: [ 'hw2/hw/**' ]
   push:
-    branches: [ main ]
-    paths: [ 'hw2/hw/**' ]
+  pull_request:
 
 jobs:
-  test-hw2:
+  tests:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.13", "3.14"]
-    
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: shop_hw5_test
+          POSTGRES_USER: shop_app
+          POSTGRES_PASSWORD: shop_local
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U shop_app -d shop_hw5_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg2://shop_app:shop_local@localhost:5432/shop_hw5_test
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-    
-    - name: Install dependencies
-      working-directory: hw2/hw
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-
-    - name: Run tests
-      working-directory: hw2/hw
-      env:
-        PYTHONPATH: ${{ github.workspace }}/hw2/hw
-      run: |
-        pytest test_homework2.py -v
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: python -m pip install -r hw3/requirements-test.txt
+      - name: Run original HW2 tests
+        run: |
+          export DATABASE_URL="$TEST_DATABASE_URL"
+          export PYTHONPATH="$PWD/hw2/hw"
+          python -c "from shop_api.db import create_tables; create_tables()"
+          python -m pytest hw2/hw/test_homework2.py -q
+      - name: Run tests and check coverage
+        run: python -m pytest hw3/tests --cov=hw2.hw.shop_api --cov-report=term-missing --cov-fail-under=95
