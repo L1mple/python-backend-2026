@@ -1,6 +1,10 @@
-# Основные зависимости для ASGI приложения
+# Основные зависимости
 fastapi>=0.117.1
 uvicorn>=0.24.0
+pydantic
+prometheus-fastapi-instrumentator
+sqlalchemy>=2.0
+psycopg2-binary
 
 # Зависимости для тестирования
 pytest>=7.4.0
