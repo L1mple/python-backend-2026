@@ -31,7 +31,7 @@ jobs:
             --cov-report=term-missing \
             --cov-report=xml \
             --cov-fail-under=95 \
-            ./test_homework2.py ./test_homework2_extra.py
+            ./test_homework2.py ./test_homework2_my.py
 
       - name: Upload coverage report
         if: always()
