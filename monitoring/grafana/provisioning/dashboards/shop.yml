@@ -1,0 +1,9 @@
+apiVersion: 1
+providers:
+  - name: Shop homework
+    orgId: 1
+    folder: Shop homework
+    type: file
+    disableDeletion: true
+    options:
+      path: /var/lib/grafana/dashboards
