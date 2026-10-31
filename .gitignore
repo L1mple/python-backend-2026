@@ -132,3 +132,8 @@ dmypy.json
 
 # macOS
 .DS_Store
+
+# Local SQLite databases
+*.db
+*.db-shm
+*.db-wal
