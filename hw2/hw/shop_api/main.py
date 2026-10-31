@@ -1,173 +1,121 @@
-from fastapi import FastAPI, HTTPException, Query, Response
-from pydantic import BaseModel, ConfigDict, Field
+from contextlib import asynccontextmanager
+from typing import Annotated
 
-app = FastAPI(title="Shop API")
+from fastapi import Depends, FastAPI, HTTPException, Query, Response
 
-items = {}
-carts = {}
-
-
-class ItemCreate(BaseModel):
-    name: str
-    price: float = Field(ge=0, allow_inf_nan=False)
-
-    model_config = ConfigDict(extra="forbid")
+from .contracts import ItemCreate, ItemPatch, ItemReplace
+from .db import create_tables, engine
+from .models import Cart, Item
+from .repository import ShopRepository, get_repository, item_response
 
 
-class ItemReplace(ItemCreate):
-    deleted: bool = False
+@asynccontextmanager
+async def lifespan(app):
+    create_tables()
+    try:
+        yield
+    finally:
+        engine.dispose()
 
 
-class ItemPatch(BaseModel):
-    name: str | None = None
-    price: float | None = Field(default=None, ge=0, allow_inf_nan=False)
-
-    model_config = ConfigDict(extra="forbid")
+app = FastAPI(title="Shop API", lifespan=lifespan)
+Repository = Annotated[ShopRepository, Depends(get_repository)]
 
 
-def find_item(item_id: int):
-    if item_id not in items:
-        raise HTTPException(status_code=404, detail="Item not found")
-    return items[item_id]
-
-
-def find_available_item(item_id: int):
-    item = find_item(item_id)
-    if item["deleted"]:
+def find_item(repository, item_id):
+    item = repository.get_item(item_id)
+    if item is None:
         raise HTTPException(status_code=404, detail="Item not found")
     return item
 
 
-def find_cart(cart_id: int):
-    if cart_id not in carts:
+def find_available_item(repository, item_id):
+    item = find_item(repository, item_id)
+    if item.deleted:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return item
+
+
+def find_cart(repository, cart_id, lock=False):
+    cart = repository.get_cart(cart_id, lock=lock)
+    if cart is None:
         raise HTTPException(status_code=404, detail="Cart not found")
-    return carts[cart_id]
-
-
-def make_cart_response(cart_id: int):
-    cart = find_cart(cart_id)
-    cart_items = []
-    total_price = 0.0
-
-    for item_id, quantity in cart.items():
-        item = items[item_id]
-        available = not item["deleted"]
-        cart_items.append({
-            "id": item_id,
-            "name": item["name"],
-            "quantity": quantity,
-            "available": available,
-        })
-        if available:
-            total_price += item["price"] * quantity
-
-    return {"id": cart_id, "items": cart_items, "price": total_price}
-
-
-def count_cart_items(cart):
-    quantity = 0
-    for item in cart["items"]:
-        quantity += item["quantity"]
-    return quantity
-
-
-def in_range(value, minimum, maximum):
-    if minimum is not None and value < minimum:
-        return False
-    if maximum is not None and value > maximum:
-        return False
-    return True
+    return cart
 
 
 @app.post("/item", status_code=201)
-async def create_item(body: ItemCreate, response: Response):
-    item_id = len(items) + 1
-    item = {
-        "id": item_id,
-        "name": body.name,
-        "price": body.price,
-        "deleted": False,
-    }
-    items[item_id] = item
-    response.headers["Location"] = f"/item/{item_id}"
-    return item
+def create_item(body: ItemCreate, response: Response, repository: Repository):
+    with repository.session.begin():
+        item = repository.save(Item(**body.model_dump()))
+        response.headers["Location"] = f"/item/{item.id}"
+        return item_response(item)
 
 
 @app.get("/item/{item_id}")
-async def get_item(item_id: int):
-    return find_available_item(item_id)
+def get_item(item_id: int, repository: Repository):
+    return item_response(find_available_item(repository, item_id))
 
 
 @app.get("/item")
-async def get_items(
+def get_items(
+    repository: Repository,
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=10, gt=0),
     min_price: float | None = Query(default=None, ge=0, allow_inf_nan=False),
     max_price: float | None = Query(default=None, ge=0, allow_inf_nan=False),
     show_deleted: bool = False,
 ):
-    result = []
-    for item in items.values():
-        if item["deleted"] and not show_deleted:
-            continue
-        if not in_range(item["price"], min_price, max_price):
-            continue
-        result.append(item)
-    return result[offset:offset + limit]
+    return repository.get_items(offset, limit, min_price, max_price, show_deleted)
 
 
 @app.put("/item/{item_id}")
-async def replace_item(item_id: int, body: ItemReplace):
-    find_item(item_id)
-    item = {
-        "id": item_id,
-        "name": body.name,
-        "price": body.price,
-        "deleted": body.deleted,
-    }
-    items[item_id] = item
-    return item
+def replace_item(item_id: int, body: ItemReplace, repository: Repository):
+    with repository.session.begin():
+        item = find_item(repository, item_id)
+        for field, value in body.model_dump().items():
+            setattr(item, field, value)
+        return item_response(item)
 
 
 @app.patch("/item/{item_id}")
-async def patch_item(item_id: int, body: ItemPatch):
-    if "name" in body.model_fields_set and body.name is None:
-        raise HTTPException(status_code=422, detail="Name cannot be null")
-    if "price" in body.model_fields_set and body.price is None:
-        raise HTTPException(status_code=422, detail="Price cannot be null")
-
-    item = find_item(item_id)
-    if item["deleted"]:
-        return Response(status_code=304)
-    if "name" in body.model_fields_set:
-        item["name"] = body.name
-    if "price" in body.model_fields_set:
-        item["price"] = body.price
-    return item
+def patch_item(item_id: int, body: ItemPatch, repository: Repository):
+    changes = body.model_dump(exclude_unset=True)
+    for field, value in changes.items():
+        if value is None:
+            raise HTTPException(status_code=422, detail=f"{field.capitalize()} cannot be null")
+    with repository.session.begin():
+        item = find_item(repository, item_id)
+        if item.deleted:
+            return Response(status_code=304)
+        for field, value in changes.items():
+            setattr(item, field, value)
+        return item_response(item)
 
 
 @app.delete("/item/{item_id}")
-async def delete_item(item_id: int):
-    item = find_item(item_id)
-    item["deleted"] = True
+def delete_item(item_id: int, repository: Repository):
+    with repository.session.begin():
+        find_item(repository, item_id).deleted = True
     return Response(status_code=200)
 
 
 @app.post("/cart", status_code=201)
-async def create_cart(response: Response):
-    cart_id = len(carts) + 1
-    carts[cart_id] = {}
-    response.headers["Location"] = f"/cart/{cart_id}"
-    return {"id": cart_id}
+def create_cart(response: Response, repository: Repository):
+    with repository.session.begin():
+        cart = repository.save(Cart())
+        response.headers["Location"] = f"/cart/{cart.id}"
+        return {"id": cart.id}
 
 
 @app.get("/cart/{cart_id}")
-async def get_cart(cart_id: int):
-    return make_cart_response(cart_id)
+def get_cart(cart_id: int, repository: Repository):
+    find_cart(repository, cart_id)
+    return repository.cart_responses([cart_id])[0]
 
 
 @app.get("/cart")
-async def get_carts(
+def get_carts(
+    repository: Repository,
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=10, gt=0),
     min_price: float | None = Query(default=None, ge=0, allow_inf_nan=False),
@@ -175,23 +123,13 @@ async def get_carts(
     min_quantity: int | None = Query(default=None, ge=0),
     max_quantity: int | None = Query(default=None, ge=0),
 ):
-    result = []
-    for cart_id in carts:
-        cart = make_cart_response(cart_id)
-        if not in_range(cart["price"], min_price, max_price):
-            continue
-        quantity = count_cart_items(cart)
-        if not in_range(quantity, min_quantity, max_quantity):
-            continue
-        result.append(cart)
-    return result[offset:offset + limit]
+    return repository.get_carts(offset, limit, min_price, max_price, min_quantity, max_quantity)
+
 
 @app.post("/cart/{cart_id}/add/{item_id}")
-async def add_item_to_cart(cart_id: int, item_id: int):
-    cart = find_cart(cart_id)
-    find_available_item(item_id)
-    if item_id not in cart:
-        cart[item_id] = 0
-
-    cart[item_id] += 1
-    return make_cart_response(cart_id)
+def add_item_to_cart(cart_id: int, item_id: int, repository: Repository):
+    with repository.session.begin():
+        find_cart(repository, cart_id, lock=True)
+        find_available_item(repository, item_id)
+        repository.add_item(cart_id, item_id)
+        return repository.cart_responses([cart_id])[0]
