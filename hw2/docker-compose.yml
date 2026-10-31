@@ -1,47 +1,29 @@
-version: "3"
-
 services:
-
-  local:
-    build:
-      context: .
-      dockerfile: ./Dockerfile
-      target: local
-    restart: always
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: shop_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
     ports:
-      - 8080:8080
-    networks:
-      - monitoring
-
-  grafana:
-    image: grafana/grafana:latest
-    ports:
-      - 3000:3000
-    restart: always
+      - "7432:5432"
     volumes:
-      - grafana_data:/var/lib/grafana
-    networks:
-      - monitoring
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
-  prometheus:
-    image: prom/prometheus
-    volumes:
-      - ./settings/prometheus/:/etc/prometheus/
-      - prometheus_data:/prometheus
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
-      - "--web.console.templates=/usr/share/prometheus/consoles"
-    networks:
-      - monitoring
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+psycopg2://postgres:password@postgres:5432/shop_db
     ports:
-      - 9090:9090
-    restart: always
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
-  prometheus_data:
-  grafana_data:
-
-networks:
-  monitoring:
+  postgres_data:
