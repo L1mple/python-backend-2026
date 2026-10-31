@@ -46,8 +46,8 @@ def existing_not_empty_carts(existing_items: list[int]) -> list[int]:
 
 @pytest.fixture()
 def existing_not_empty_cart_id(
-    existing_empty_cart_id: int,
-    existing_items: list[int],
+        existing_empty_cart_id: int,
+        existing_items: list[int],
 ) -> int:
     for item_id in faker.random_elements(existing_items, unique=False, length=3):
         client.post(f"/cart/{existing_empty_cart_id}/add/{item_id}")
@@ -219,9 +219,9 @@ def test_get_item_list(query: dict[str, Any], status_code: int) -> None:
     ],
 )
 def test_put_item(
-    existing_item: dict[str, Any],
-    body: dict[str, Any],
-    status_code: int,
+        existing_item: dict[str, Any],
+        body: dict[str, Any],
+        status_code: int,
 ) -> None:
     item_id = existing_item["id"]
     response = client.put(f"/item/{item_id}", json=body)
@@ -244,14 +244,14 @@ def test_put_item(
         ("existing_item", {"price": 9.99}, HTTPStatus.OK),
         ("existing_item", {"name": "new name", "price": 9.99}, HTTPStatus.OK),
         (
-            "existing_item",
-            {"name": "new name", "price": 9.99, "odd": "value"},
-            HTTPStatus.UNPROCESSABLE_ENTITY,
+                "existing_item",
+                {"name": "new name", "price": 9.99, "odd": "value"},
+                HTTPStatus.UNPROCESSABLE_ENTITY,
         ),
         (
-            "existing_item",
-            {"name": "new name", "price": 9.99, "deleted": True},
-            HTTPStatus.UNPROCESSABLE_ENTITY,
+                "existing_item",
+                {"name": "new name", "price": 9.99, "deleted": True},
+                HTTPStatus.UNPROCESSABLE_ENTITY,
         ),
     ],
 )
