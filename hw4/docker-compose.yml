@@ -1,0 +1,54 @@
+services:
+
+  # Основная БД сервиса
+  db:
+    image: postgres:16
+    restart: always
+    environment:
+      POSTGRES_USER: shop
+      POSTGRES_PASSWORD: shop
+      POSTGRES_DB: shop
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shop -d shop"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # Сам сервис: ждет, пока БД станет готова принимать подключения
+  api:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    restart: always
+    environment:
+      DATABASE_URL: postgresql+psycopg://shop:shop@db:5432/shop
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # MySQL нужен только для скриптов из isolation/: в PostgreSQL нельзя показать dirty read.
+  # Запускается по профилю: docker compose --profile isolation up -d mysql
+  mysql:
+    image: mysql:8.4
+    profiles: ["isolation"]
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: shop
+      MYSQL_USER: shop
+      MYSQL_PASSWORD: shop
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -ushop -pshop --silent"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  pgdata:
