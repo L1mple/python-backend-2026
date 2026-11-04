@@ -1,0 +1,58 @@
+services:
+
+  shop-api:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    restart: always
+    ports:
+      - "8080:8080"
+
+  prometheus:
+    image: prom/prometheus:latest
+    restart: always
+    volumes:
+      - ./settings/prometheus/:/etc/prometheus/
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    ports:
+      - "9090:9090"
+    depends_on:
+      - shop-api
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: always
+    environment:
+      # Локальный стенд: заходим без логина, главная страница - наш дашборд
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/shop-api.json
+    volumes:
+      - ./settings/grafana/provisioning/:/etc/grafana/provisioning/
+      - ./settings/grafana/dashboards/:/var/lib/grafana/dashboards/
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
+  # Генератор нагрузки, чтобы на дашбордах были данные.
+  # Запускается только с профилем: docker compose --profile load up
+  loadgen:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    profiles: ["load"]
+    command: ["python", "load.py", "--url", "http://shop-api:8080"]
+    healthcheck:
+      disable: true  # проверка здоровья из образа относится к веб-серверу, а не к генератору
+    depends_on:
+      - shop-api
+
+volumes:
+  prometheus-data:
+  grafana-data:

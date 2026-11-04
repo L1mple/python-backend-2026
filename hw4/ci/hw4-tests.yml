@@ -1,0 +1,56 @@
+name: "HW4/HW5 Tests"
+
+# Тесты сервиса с БД (ДЗ4) и проверка покрытия (ДЗ5)
+on:
+  pull_request:
+    branches: [ main ]
+    paths: [ 'hw4/**', '.github/workflows/hw4-tests.yml' ]
+  push:
+    branches: [ main ]
+    paths: [ 'hw4/**', '.github/workflows/hw4-tests.yml' ]
+
+jobs:
+  test-hw4:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.13", "3.14"]
+
+    # PostgreSQL поднимается рядом с тестами как сервисный контейнер
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: shop
+          POSTGRES_PASSWORD: shop
+          POSTGRES_DB: shop
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U shop -d shop"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg://shop:shop@localhost:5432/shop
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      working-directory: hw4
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-test.txt
+
+    - name: Run tests with coverage (fail under 95%)
+      working-directory: hw4
+      run: |
+        pytest -v --cov=shop_api --cov-report=term-missing --cov-fail-under=95
