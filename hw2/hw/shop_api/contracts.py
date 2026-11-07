@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, NonNegativeFloat
 
-from shop_api.storage import Item
+from shop_api.models import Item
 
 
 class ItemRequest(BaseModel):

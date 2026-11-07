@@ -1,8 +1,34 @@
 services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: shop
+      POSTGRES_USER: shop
+      POSTGRES_PASSWORD: shop
+    # Порт открыт только на localhost: для тестов и скриптов с хоста
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      # С версии 18 образ хранит данные в /var/lib/postgresql/18/docker,
+      # поэтому том монтируется на уровень выше, а не в .../data
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shop -d shop"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+    restart: unless-stopped
+
   shop:
     build: .
+    environment:
+      DATABASE_URL: postgresql+asyncpg://shop:shop@postgres:5432/shop
     ports:
       - "127.0.0.1:8080:8080"
+    # Сервис стартует, когда PostgreSQL уже принимает соединения
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
   prometheus:
@@ -30,3 +56,6 @@ services:
     depends_on:
       - prometheus
     restart: unless-stopped
+
+volumes:
+  postgres-data:

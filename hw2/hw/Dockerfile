@@ -13,6 +13,8 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 COPY shop_api ./shop_api
+# Скрипты с уровнями изоляции: их можно запустить прямо в контейнере
+COPY isolation ./isolation
 
 # Сервис не нужно запускать от root
 RUN useradd --create-home app

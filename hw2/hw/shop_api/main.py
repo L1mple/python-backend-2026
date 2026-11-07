@@ -1,9 +1,21 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from prometheus_fastapi_instrumentator import Instrumentator
 
+from shop_api import db
 from shop_api.routers import carts, chat, items
 
-app = FastAPI(title="Shop API")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    await db.create_schema()
+    yield
+    await db.engine.dispose()
+
+
+app = FastAPI(title="Shop API", lifespan=lifespan)
 
 app.include_router(items.router)
 app.include_router(carts.router)
