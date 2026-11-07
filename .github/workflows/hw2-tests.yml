@@ -15,7 +15,26 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.13", "3.14"]
-    
+
+    # Магазин хранит данные в PostgreSQL, тестам нужна живая БД
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: shop
+          POSTGRES_USER: shop
+          POSTGRES_PASSWORD: shop
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U shop -d shop"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://shop:shop@127.0.0.1:5432/shop
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -31,9 +50,17 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Run tests
+    - name: Run tests with coverage
+      working-directory: hw2/hw
+      env:
+        PYTHONPATH: ${{ github.workspace }}/hw2/hw
+      # Все тесты из hw2/hw, настройки покрытия в .coveragerc. Ниже 95% шаг падает
+      run: |
+        pytest -v --cov --cov-fail-under=95
+
+    - name: Run isolation level demos
       working-directory: hw2/hw
       env:
         PYTHONPATH: ${{ github.workspace }}/hw2/hw
       run: |
-        pytest test_homework2.py -v
+        python -m isolation
