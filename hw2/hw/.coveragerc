@@ -1,0 +1,9 @@
+[run]
+source = shop_api
+branch = True
+# SQLAlchemy в async-режиме ходит в БД через greenlet. Без greenlet здесь
+# coverage теряет строки после первого await к базе и показывает около 80%
+concurrency = greenlet, thread
+
+[report]
+show_missing = True

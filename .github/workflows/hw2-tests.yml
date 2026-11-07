@@ -50,12 +50,13 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Run tests
+    - name: Run tests with coverage
       working-directory: hw2/hw
       env:
         PYTHONPATH: ${{ github.workspace }}/hw2/hw
+      # Все тесты из hw2/hw, настройки покрытия в .coveragerc. Ниже 95% шаг падает
       run: |
-        pytest test_homework2.py -v
+        pytest -v --cov --cov-fail-under=95
 
     - name: Run isolation level demos
       working-directory: hw2/hw
